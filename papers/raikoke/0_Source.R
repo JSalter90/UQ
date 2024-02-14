@@ -19,6 +19,8 @@ source('BuildEmulator/BuildEmulator.R')
 # From ExeterUQ
 
 
+# Load design matrix
+design <- readRDS('papers/raikoke/data/design.rds')
 
 # Defining parameter ranges
 minMER <- 50.7 * 10^7 * (9 - 0.551)^(1/0.241) * 0.33 * 0.5/100
