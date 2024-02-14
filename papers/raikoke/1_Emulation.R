@@ -11,3 +11,11 @@ tDataT3 <- readRDS("papers/raikoke/data/tDataT3.rds")
 tDataT5 <- readRDS("papers/raikoke/data/tDataT3.rds")
 tDataT7 <- readRDS("papers/raikoke/data/tDataT3.rds")
 
+# Also for each region
+# R1 = N, R2 = S, R3 = W, R4 = E, R5 = NW, R6 = NE, R7 = SE, R8 = SW
+# When given in a list of 8 objects, this is the order
+# Sometimes objects will have Rx in the name, where x relates to the above numbering
+tData_regions <- readRDS("papers/raikoke/data/tDataT3.rds")
+
+
+
