@@ -35,8 +35,24 @@ data.frame(Type = c('Pseudo', 'Overall', 'Cons'),
                       sum(Exp_T3_var1$overall_impl > 3), 
                       sum(Exp_T3_var1$total_matches == 0)))
 
+#### Repeat for other time points, combinations of regions ####
+# T5
+tDataT5 <- readRDS("papers/raikoke/data/tDataT5.rds")
+Exp_T5_var1 <- PseudoExperiment(tDataT5, val_inds, EnsPred_T5, obs_error = 1 * obs_var[2])
+Exp_T5_var01 <- PseudoExperiment(tDataT5, val_inds, EnsPred_T5, obs_error = 0.1 * obs_var[2])
+Exp_T5_var001 <- PseudoExperiment(tDataT5, val_inds, EnsPred_T5, obs_error = 0.01 * obs_var[2])
 
+# T7
+tDataT7 <- readRDS("papers/raikoke/data/tDataT7.rds")
+Exp_T7_var1 <- PseudoExperiment(tDataT7, val_inds, EnsPred_T7, obs_error = 1 * obs_var[3])
+Exp_T7_var01 <- PseudoExperiment(tDataT7, val_inds, EnsPred_T7, obs_error = 0.1 * obs_var[3])
+Exp_T7_var001 <- PseudoExperiment(tDataT7, val_inds, EnsPred_T7, obs_error = 0.01 * obs_var[3])
 
+# N+S (R1+R2)
 
+# W+E (R3+R4)
 
+# 4 regions (R5+R6+R7+R8)
+
+# 3/4 regions
 

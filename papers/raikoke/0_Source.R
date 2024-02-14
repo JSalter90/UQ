@@ -19,6 +19,16 @@ source('BuildEmulator/BuildEmulator.R')
 # From ExeterUQ
 
 
+
+# Defining parameter ranges
+minMER <- 50.7 * 10^7 * (9 - 0.551)^(1/0.241) * 0.33 * 0.5/100
+maxMER <- 50.7 * 10^7 * (17 - 0.551)^(1/0.241) * 3 * 20/100
+parRanges <- data.frame(parameter = colnames(design)[3:13],
+                        lower = c(9,0.5,0.33,minMER,1350,0,9,0.0025,100,0.27,log(minMER)),
+                        upper = c(17,20,3,maxMER,2500,17,15,2.75,900,1.74,log(maxMER)))
+
+
+
 #### Additional functions for this work specifically ####
 # Plot NAME output
 PlotPlume <- function(output, xlims = c(140,200), ylims = c(40, 61), zlims = c(0,log(5000)), longitude = lon, latitude = lat, obs = NULL, cols = viridis(100), ...){
