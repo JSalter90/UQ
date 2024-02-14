@@ -110,11 +110,12 @@ ValT5$plot1
 ValT7 <- ValidateBoth(EmT7, EmT7_MET, tDataT7, design[,-4], train_inds, val_inds, train_inds, val_inds)
 ValT7$plot1
 
-# Can also use other functions with this type of emulator, e.g
+# Can also use other functions with this type of emulator, e.g LOO for T7
 LOO.plot(Emulators = EmT7, which.emulator = 1,
          ParamNames = colnames(tDataT7)[EmT7$fitting.elements$ActiveIndices[[1]]])
+# Out-of-sample predictions for T7
 ValidationMOGP(NewData = tDataT7[val_inds,], EmT7, tData = tDataT7[train_inds,], which.emulator = 1, 
-               ParamNames = colnames(tDataT7[train_inds,])[Em_Obs$fitting.elements$ActiveIndices[[1]]])
+               ParamNames = colnames(tDataT7[train_inds,])[EmT7$fitting.elements$ActiveIndices[[1]]])
 
 # Above function plots, reports % in 95% prediction interval
 # Could also consider other metrics, e.g. compare RMSE between the 2 sets of emulators
@@ -128,7 +129,21 @@ rmserr(ValT7$overall$Mean, ValT7$overall$Truth)$rmse
 rmserr(ValT7$met$Mean, ValT7$met$Truth)$rmse
 
 # Repeat for all regions
+# As all T3, just going to assume same priors as for T3 above
 
+# Fitting overall emulators for regions 1-8, ignoring 6 for now
+# These are reasonably slow ()
+dir.create('papers/raikoke/data/EmRegion')
+for (i in c(1:5,7:8)){
+  EmRegion <- BuildNewEmulators(tData = tData_regions[[i]][train_inds,], HowManyEmulators = 1, meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT3))
+  save_ExUQmogp(EmRegion, file = paste0('papers/raikoke/data/EmRegion/region', i))
+}
+
+# For region 6, there's a single run with zero (hence log = -Inf), just remove this here
+tmp_inds <- train_inds
+tmp_inds <- tmp_inds[!(tmp_inds == which(tData_regions[[6]]$LogTotal == -Inf))] # should be run 74
+EmRegion <- BuildNewEmulators(tData = tData_regions[[6]][tmp_inds,], HowManyEmulators = 1, meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT3))
+save_ExUQmogp(EmRegion, file = paste0('papers/raikoke/data/EmRegion/region', 6))
 
 
 
