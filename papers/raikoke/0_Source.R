@@ -1,23 +1,26 @@
 #### Loading general required for NAME/Raikoke 2019 emulation ####
-library(ggplot2)
-library(dplyr)
-library(reshape2)
-library(fields)
-library(viridis)
-library(plyr)
-library(cowplot)
-library(GGally)
-library(akima)
+packages <- c('ggplot2','dplyr','cowplot','reticulate','pracma', 'invgamma', 'GenSA', 'far', 'fields', 'lhs', 'maps', 
+              'mco', 'mvtnorm', 'ncdf4', 'parallel', 'reshape2', 'shape', 'tensor', 'viridis', 'withr', 'loo','MASS')
+sapply(packages, require, character.only = TRUE, quietly = TRUE)
 
 source('code/mogp_save.R')
 source('code/mogp_new_wrappers.R')
 source('code/mogp_basis.R')
 
-# From ExeterMOGP
-source('BuildEmulator/BuildEmulator.R')
+# Emulation here done with mogp_emulator, found here: https://github.com/alan-turing-institute/mogp_emulator
+mogp_dir <- '/Users/jamessalter/mogp_emulator/' # location of mogp installation
+twd <- getwd()
+setwd(mogp_dir)
+mogp_emulator <- import("mogp_emulator")
+mogp_priors <- import("mogp_emulator.Priors")
+mogp_kernels <- import("mogp_emulator.Kernel")
+setwd(twd)
 
-# From ExeterUQ
-
+# We use parts of the the R front end from https://bayesexeter.github.io/ExeterUQ_MOGP/
+#exeterUQ_mogp_dir <- '~/Documents/ExeterUQ_MOGP'
+#setwd(exeterUQ_mogp_dir)
+#source('BuildEmulator/BuildEmulator.R')
+#setwd(twd)
 
 # Load design matrix
 design <- readRDS('papers/raikoke/data/design.rds')
