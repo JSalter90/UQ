@@ -24,6 +24,69 @@ tData_regions <- readRDS("papers/raikoke/data/tDataT3.rds")
 # Key assumption we make is that first fit a (possibly complex) mean function to explain variability
 # This process also selects active/inactive variables prior to fitting covariance
 
+tDataT3$MER <- NULL # remove this column if not already
+
+# MOGP emulator objects contain a set of default priors (under choices.default)
+# It's likely that these need setting differently in order to find a good emulator
+# In this work, fitting process was not automatic
+# Edited things like NuggetProportion (nugget prior), lm.maxdf (number of terms allowed in mean function) in order to get emulator(s) that validate well
+# Final choices of these are shown
+# For T3, T5, T7, these are not run here as the emulators exist on Github, and are loaded in later
+PriorT3 <- choices.default
+PriorT3$NuggetProportion <- 0.1
+# dir.create('papers/raikoke/data/EmT3') # if this emulator hasn't been created before, create a directory to store it in
+# EmT3 <- BuildNewEmulators(tData = tDataT3, HowManyEmulators = 1, meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT3))
+# save_ExUQmogp(EmT3, file = 'papers/raikoke/data/EmT3/train')
+
+# For each MET
+PriorT3_MET <- choices.default
+PriorT3_MET$NuggetProportion <- 0.75
+PriorT3_MET$lm.maxdf <- 3 # we have only ~35 training points for each, so this choice should be low, but also whether we overfit/underfit will be quite sensitive to this
+# dir.create('papers/raikoke/data/EmT3_MET')
+# EmT3_MET <- NULL
+# for (m in 0:17){
+#   EmT3_MET[[m+1]] <- BuildNewEmulators(tData = tDataT3[train_inds[which(design$MET[train_inds] == m)],], HowManyEmulators = 1,
+#                                        meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT3_MET))
+# }
+# SaveMulti(EmT3_MET, file = 'papers/raikoke/data/EmT3_MET/train')
+
+# T5
+PriorT5 <- choices.default
+PriorT5$NuggetProportion <- 0.1
+# dir.create('papers/raikoke/data/EmT5')
+# EmT5 <- BuildNewEmulators(tData = tDataT5, HowManyEmulators = 1, meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT5))
+# save_ExUQmogp(EmT5, file = 'papers/raikoke/data/EmT5/train')
+
+# By MET
+PriorT5_MET <- choices.default
+PriorT5_MET$NuggetProportion <- 0.75
+PriorT5_MET$lm.maxdf <- 3
+# dir.create('papers/raikoke/data/EmT5_MET')
+# EmT5_MET <- NULL
+# for (m in 0:17){
+#   EmT5_MET[[m+1]] <- BuildNewEmulators(tData = tDataT5[train_inds[which(design$MET[train_inds] == m)],], HowManyEmulators = 1,
+#                                        meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT5_MET))
+# }
+# SaveMulti(EmT5_MET, file = 'papers/raikoke/data/EmT5_MET/train')
+
+# T7
+PriorT7 <- choices.default
+PriorT7$NuggetProportion <- 0.05
+# dir.create('papers/raikoke/data/EmT7')
+# EmT7 <- BuildNewEmulators(tData = tDataT7, HowManyEmulators = 1, meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT7))
+# save_ExUQmogp(EmT7, file = 'papers/raikoke/data/EmT7/train')
+
+# By MET
+PriorT7_MET <- choices.default
+PriorT7_MET$NuggetProportion <- 0.5
+PriorT7_MET$lm.maxdf <- 4
+# dir.create('papers/raikoke/data/EmT7_MET')
+# EmT7_MET <- NULL
+# for (m in 0:17){
+#   EmT7_MET[[m+1]] <- BuildNewEmulators(tData = tDataT7[train_inds[which(design$MET[train_inds] == m)],], HowManyEmulators = 1,
+#                                        meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT7_MET))
+# }
+# SaveMulti(EmT7_MET, file = 'papers/raikoke/data/EmT7_MET/train')
 
 
 #### Loading emulators ####
@@ -46,6 +109,12 @@ ValT5$plot1
 
 ValT7 <- ValidateBoth(EmT7, EmT7_MET, tDataT7, design[,-4], train_inds, val_inds, train_inds, val_inds)
 ValT7$plot1
+
+# Can also use other functions with this type of emulator, e.g
+LOO.plot(Emulators = EmT7, which.emulator = 1,
+         ParamNames = colnames(tDataT7)[EmT7$fitting.elements$ActiveIndices[[1]]])
+ValidationMOGP(NewData = tDataT7[val_inds,], EmT7, tData = tDataT7[train_inds,], which.emulator = 1, 
+               ParamNames = colnames(tDataT7[train_inds,])[Em_Obs$fitting.elements$ActiveIndices[[1]]])
 
 # Above function plots, reports % in 95% prediction interval
 # Could also consider other metrics, e.g. compare RMSE between the 2 sets of emulators
