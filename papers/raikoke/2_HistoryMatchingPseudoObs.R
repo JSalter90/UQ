@@ -9,11 +9,12 @@
 val_inds <- readRDS("papers/raikoke/data/val_inds.rds")
 tDataT3 <- readRDS("papers/raikoke/data/tDataT3.rds")
 
-#### Also need predictions over the ensemble somewhere ####
+# Load in emulator predictions across the 1000 ensemble members (only need the 250 val points)
+EnsPredT3 <- readRDS("papers/raikoke/data/EnsPredT3.rds")
 
-Exp_T3_var1 <- PseudoExperiment(tDataT3, val_inds, EnsPred_T3, obs_error = 1 * obs_var[1])
-Exp_T3_var01 <- PseudoExperiment(tDataT3, val_inds, EnsPred_T3, obs_error = 0.1 * obs_var[1])
-Exp_T3_var001 <- PseudoExperiment(tDataT3, val_inds, EnsPred_T3, obs_error = 0.01 * obs_var[1])
+Exp_T3_var1 <- PseudoExperiment(tDataT3, val_inds, EnsPredT3, obs_error = 1 * obs_var[1])
+Exp_T3_var01 <- PseudoExperiment(tDataT3, val_inds, EnsPredT3, obs_error = 0.1 * obs_var[1])
+Exp_T3_var001 <- PseudoExperiment(tDataT3, val_inds, EnsPredT3, obs_error = 0.01 * obs_var[1])
 
 # How often rule out the truth using overall emulator:
 sum(Exp_T3_var1$overall_impl > 3)
@@ -38,15 +39,17 @@ data.frame(Type = c('Pseudo', 'Overall', 'Cons'),
 #### Repeat for other time points, combinations of regions ####
 # T5
 tDataT5 <- readRDS("papers/raikoke/data/tDataT5.rds")
-Exp_T5_var1 <- PseudoExperiment(tDataT5, val_inds, EnsPred_T5, obs_error = 1 * obs_var[2])
-Exp_T5_var01 <- PseudoExperiment(tDataT5, val_inds, EnsPred_T5, obs_error = 0.1 * obs_var[2])
-Exp_T5_var001 <- PseudoExperiment(tDataT5, val_inds, EnsPred_T5, obs_error = 0.01 * obs_var[2])
+EnsPredT5 <- readRDS("papers/raikoke/data/EnsPredT5.rds")
+Exp_T5_var1 <- PseudoExperiment(tDataT5, val_inds, EnsPredT5, obs_error = 1 * obs_var[2])
+Exp_T5_var01 <- PseudoExperiment(tDataT5, val_inds, EnsPredT5, obs_error = 0.1 * obs_var[2])
+Exp_T5_var001 <- PseudoExperiment(tDataT5, val_inds, EnsPredT5, obs_error = 0.01 * obs_var[2])
 
 # T7
 tDataT7 <- readRDS("papers/raikoke/data/tDataT7.rds")
-Exp_T7_var1 <- PseudoExperiment(tDataT7, val_inds, EnsPred_T7, obs_error = 1 * obs_var[3])
-Exp_T7_var01 <- PseudoExperiment(tDataT7, val_inds, EnsPred_T7, obs_error = 0.1 * obs_var[3])
-Exp_T7_var001 <- PseudoExperiment(tDataT7, val_inds, EnsPred_T7, obs_error = 0.01 * obs_var[3])
+EnsPredT7 <- readRDS("papers/raikoke/data/EnsPredT7.rds")
+Exp_T7_var1 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 1 * obs_var[3])
+Exp_T7_var01 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 0.1 * obs_var[3])
+Exp_T7_var001 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 0.01 * obs_var[3])
 
 # N+S (R1+R2)
 
