@@ -33,6 +33,16 @@ parRanges <- data.frame(parameter = colnames(design)[3:13],
                         lower = c(9,0.5,0.33,minMER,1350,0,9,0.0025,100,0.27,log(minMER)),
                         upper = c(17,20,3,maxMER,2500,17,15,2.75,900,1.74,log(maxMER)))
 
+# Scaling design to [-1,1]
+ScaledDesign <- design[,c(3:7,9:13)] # ignore MET
+for (i in 1:ncol(ScaledDesign)){
+  ind <- which(parRanges$parameter == colnames(ScaledDesign)[i])
+  ScaledDesign[,i] <- ScaledDesign[,i] - parRanges$lower[ind]
+  ScaledDesign[,i] <- ScaledDesign[,i] / ((parRanges$upper[ind] - parRanges$lower[ind])/2)
+  ScaledDesign[,i] <- ScaledDesign[,i] - 1
+}
+ScaledDesign$MER <- NULL # for consistency; never use this variable in emulation/calibration as log(MER) is included
+
 # Observation information
 # For history matching, require estimated obs (mean/median), observation error variance
 # $Mean gives mean (on log scale), $Var gives estimated variance (on log scale)
@@ -153,9 +163,9 @@ PredictBoth <- function(em1, em2, Design){
 #' \item{cons_size}{Size of conservative NROY in each experiment}
 #'
 #' @export
-PseudoExperiment <- function(tData, val_inds, em_pred, obs_error, kmax = 1){
+PseudoExperiment <- function(tData, val_inds, em_pred, obs_error, kmax = 1, bound = 3){
   
-  if (is.list(tData)){
+  if (length(dim(tData)) == 0){
     ell <- length(tData)
     stopifnot(ell == length(em_pred)) # checking provided same number of sets of predictions as number of outputs
     stopifnot(ell == length(val_inds)) # checking provided validation indices for each output
@@ -203,36 +213,36 @@ PseudoExperiment <- function(tData, val_inds, em_pred, obs_error, kmax = 1){
       impl_all[,k] <- (abs(em_pred[[k]]$overall$Mean - pseudo_obs[k]) / sqrt(em_pred[[k]]$overall$SD^2 + obs_error[k]))[val_inds[[k]]]
     }
     impl_all <- apply(impl_all, 1, kth_max, k = kmax)
-    overall_size[i] <- sum(impl_all < 3) / n
+    overall_size[i] <- sum(impl_all < bound) / n
     
     # Calculate implausibility for each MET
-    impl_MET <- array(0, n, 18, ell)
+    impl_MET <- array(0, dim = c(n, 18, ell))
     for (k in 1:ell){
       for (j in 1:18){
         impl_MET[,j,k] <- abs(em_pred[[k]]$met[[j]]$Mean[val_inds[[k]]] - pseudo_obs[k]) / sqrt(em_pred[[k]]$met[[j]]$SD[val_inds[[k]]]^2 + obs_error[k])
       }
     }
-    impl_MET[,j] <- apply(impl_MET, c(1,2), kth_max, k = kmax)
+    impl_MET <- apply(impl_MET, c(1,2), kth_max, k = kmax)
     total_matches[i] <- sum(impl_MET[i,] < bound) # count how many METs the chosen 'obs' are in NROY for 
     
     # Size of pseudo NROY space
-    pseudo_size[i] <- sum(apply(impl_MET < 3, 1, sum) > 8) / n
+    pseudo_size[i] <- sum(apply(impl_MET < bound, 1, sum) > 8) / n
     
     # Size of conservative NROY space
-    cons_size[i] <- sum(apply(impl_MET < 3, 1, sum) > 0) / n
+    cons_size[i] <- sum(apply(impl_MET < bound, 1, sum) > 0) / n
   }
   
-  return(list(overall_impl,
-              overall_size,
-              total_matches,
-              pseudo_size,
-              cons_size))
+  return(list(overall_impl = overall_impl,
+              overall_size = overall_size,
+              total_matches = total_matches,
+              pseudo_size = pseudo_size,
+              cons_size = cons_size))
 }
 
 
 kth_max <- function(x,k) {
   sorted_values <- sort(x, decreasing = TRUE)
-  sorted_values[k]  # Returns the second maximum
+  sorted_values[k]  # returns the kth maximum
 }
 
 
