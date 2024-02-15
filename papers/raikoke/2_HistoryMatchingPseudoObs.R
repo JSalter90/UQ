@@ -85,10 +85,32 @@ EnsPredRegion7 <- PredictBoth(EmRegion7, EmRegion7_MET, ScaledDesign)
 EnsPredRegion8 <- PredictBoth(EmRegion8, EmRegion8_MET, ScaledDesign)
 
 # N+S (R1+R2)
-
-
+Exp_NS_var1 <- PseudoExperiment(list(tData_regions[[1]], tData_regions[[2]]),
+                                list(val_inds, val_inds),
+                                list(EnsPredRegion1, EnsPredRegion2),
+                                obs_error = c(obs_varR1, obs_varR2))
+Exp_NS_var01 <- PseudoExperiment(list(tData_regions[[1]], tData_regions[[2]]),
+                                list(val_inds, val_inds),
+                                list(EnsPredRegion1, EnsPredRegion2),
+                                obs_error = 0.1*c(obs_varR1, obs_varR2))
+Exp_NS_var001 <- PseudoExperiment(list(tData_regions[[1]], tData_regions[[2]]),
+                                list(val_inds, val_inds),
+                                list(EnsPredRegion1, EnsPredRegion2),
+                                obs_error = 0.01*c(obs_varR1, obs_varR2))
 
 # W+E (R3+R4)
+Exp_WE_var1 <- PseudoExperiment(list(tData_regions[[3]], tData_regions[[4]]),
+                                list(val_inds, val_inds),
+                                list(EnsPredRegion3, EnsPredRegion4),
+                                obs_error = c(obs_varR3, obs_varR4))
+Exp_WE_var01 <- PseudoExperiment(list(tData_regions[[3]], tData_regions[[4]]),
+                                 list(val_inds, val_inds),
+                                 list(EnsPredRegion3, EnsPredRegion4),
+                                 obs_error = 0.1*c(obs_varR3, obs_varR4))
+Exp_WE_var001 <- PseudoExperiment(list(tData_regions[[3]], tData_regions[[4]]),
+                                  list(val_inds, val_inds),
+                                  list(EnsPredRegion3, EnsPredRegion4),
+                                  obs_error = 0.01*c(obs_varR3, obs_varR4))
 
 # 4 regions (R5+R6+R7+R8)
 
