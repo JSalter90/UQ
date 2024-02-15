@@ -9,18 +9,19 @@ source('code/mogp_basis.R')
 
 # Emulation here done with mogp_emulator, found here: https://github.com/alan-turing-institute/mogp_emulator
 mogp_dir <- '/Users/jamessalter/mogp_emulator/' # location of mogp installation
-twd <- getwd()
-setwd(mogp_dir)
-mogp_emulator <- import("mogp_emulator")
-mogp_priors <- import("mogp_emulator.Priors")
-mogp_kernels <- import("mogp_emulator.Kernel")
-setwd(twd)
+# This section is handled within BuildEmulator.R (below), given mogp_dir
+# twd <- getwd()
+# setwd(mogp_dir)
+# mogp_emulator <- import("mogp_emulator")
+# mogp_priors <- import("mogp_emulator.Priors")
+# mogp_kernels <- import("mogp_emulator.Kernel")
 
 # We use parts of the the R front end from https://bayesexeter.github.io/ExeterUQ_MOGP/
-#exeterUQ_mogp_dir <- '~/Documents/ExeterUQ_MOGP'
-#setwd(exeterUQ_mogp_dir)
-#source('BuildEmulator/BuildEmulator.R')
-#setwd(twd)
+exeterUQ_mogp_dir <- '/Users/jamessalter/Documents/ExeterUQ_MOGP'
+uqdir <- getwd()
+setwd(exeterUQ_mogp_dir)
+source('BuildEmulator/BuildEmulator.R')
+setwd(uqdir)
 
 # Load design matrix
 design <- readRDS('papers/raikoke/data/design.rds')
@@ -35,12 +36,12 @@ parRanges <- data.frame(parameter = colnames(design)[3:13],
 # Observation information
 # For history matching, require estimated obs (mean/median), observation error variance
 # $Mean gives mean (on log scale), $Var gives estimated variance (on log scale)
-obs <- data.frame(Type = c('T3', 'T5', 'T7', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8'),
-                  Mean = c(),
-                  Var = c())
+# obs <- data.frame(Type = c('T3', 'T5', 'T7', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8'),
+#                   Mean = c(),
+#                   Var = c())
 
 # Just load this in
-obs <- readRDS('papers/raikoke/data/obs.rds')
+#obs <- readRDS('papers/raikoke/data/obs.rds')
 
 
 
