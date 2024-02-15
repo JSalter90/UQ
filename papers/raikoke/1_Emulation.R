@@ -132,7 +132,7 @@ rmserr(ValT7$met$Mean, ValT7$met$Truth)$rmse
 # As all T3, just going to assume same priors as for T3 above
 
 # Fitting overall emulators for regions 1-8, ignoring 6 for now
-# These are reasonably slow ()
+# These are reasonably slow (O(minutes), as there's 750 training points)
 dir.create('papers/raikoke/data/EmRegion')
 for (i in c(1:5,7:8)){
   EmRegion <- BuildNewEmulators(tData = tData_regions[[i]][train_inds,], HowManyEmulators = 1, meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT3))
@@ -145,9 +145,27 @@ tmp_inds <- tmp_inds[!(tmp_inds == which(tData_regions[[6]]$LogTotal == -Inf))] 
 EmRegion <- BuildNewEmulators(tData = tData_regions[[6]][tmp_inds,], HowManyEmulators = 1, meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT3))
 save_ExUQmogp(EmRegion, file = paste0('papers/raikoke/data/EmRegion/region', 6))
 
+# Fitting MET emulators
+# These are all fast (O(seconds), as at most ~45 training points)
+dir.create('papers/raikoke/data/EmRegion_MET')
+twd <- getwd()
+setwd('papers/raikoke/data/EmRegion_MET')
+for (i in c(1:5,7:8)){
+  EmRegion_MET <- NULL
+  for (m in 0:17){
+    EmRegion_MET[[m+1]] <- BuildNewEmulators(tData = tData_regions[[i]][train_inds[which(design$MET[train_ind] == m)],], HowManyEmulators = 1,
+                                              meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT3_MET))
+  }
+  SaveMulti(EmRegion_MET, file = paste0('region', i))
+}
 
-
-
+EmRegion_MET <- NULL
+for (m in 0:17){
+  EmRegion_MET[[m+1]] <- BuildNewEmulators(tData = tData_regions[[6]][tmp_inds[which(design$MET[tmp_inds] == m)],], HowManyEmulators = 1,
+                                           meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT3_MET))
+}
+SaveMulti(EmRegion_MET, file = paste0('region', 6))
+setwd(twd)
 
 
 
