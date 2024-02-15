@@ -68,14 +68,14 @@ EmRegion7 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region7')
 EmRegion8 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region8')
 
 # By MET
-EmRegion1_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region1', 'region1')
-EmRegion2_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region2', 'region2')
-EmRegion3_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region3', 'region3')
-EmRegion4_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region4', 'region4')
-EmRegion5_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region5', 'region5')
-EmRegion6_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region6', 'region6')
-EmRegion7_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region7', 'region7')
-EmRegion8_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region8', 'region8')
+EmRegion1_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region1', 'region1')
+EmRegion2_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region2', 'region2')
+EmRegion3_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region3', 'region3')
+EmRegion4_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region4', 'region4')
+EmRegion5_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region5', 'region5')
+EmRegion6_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region6', 'region6')
+EmRegion7_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region7', 'region7')
+EmRegion8_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region8', 'region8')
 
 # Predictions
 EnsPredRegion1 <- PredictBoth(EmRegion1, EmRegion1_MET, ScaledDesign)
