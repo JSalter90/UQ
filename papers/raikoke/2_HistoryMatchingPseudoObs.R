@@ -51,7 +51,42 @@ Exp_T7_var1 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 1 * ob
 Exp_T7_var01 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 0.1 * obs_var[3])
 Exp_T7_var001 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 0.01 * obs_var[3])
 
+# Regions
+tData_regions <- readRDS("papers/raikoke/data/tData_regions.rds")
+# Need to load in emulators, create predictions across the ensemble
+# Overall
+EmRegion1 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region1')
+EmRegion2 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region2')
+EmRegion3 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region3')
+EmRegion4 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region4')
+EmRegion5 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region5')
+EmRegion6 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region6')
+EmRegion7 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region7')
+EmRegion8 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region8')
+
+# By MET
+EmRegion1_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region1', 'region1')
+EmRegion2_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region2', 'region2')
+EmRegion3_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region3', 'region3')
+EmRegion4_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region4', 'region4')
+EmRegion5_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region5', 'region5')
+EmRegion6_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region6', 'region6')
+EmRegion7_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region7', 'region7')
+EmRegion8_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region8', 'region8')
+
+# Predictions
+EnsPredRegion1 <- PredictBoth(EmRegion1, EmRegion1_MET, ScaledDesign)
+EnsPredRegion2 <- PredictBoth(EmRegion2, EmRegion2_MET, ScaledDesign)
+EnsPredRegion3 <- PredictBoth(EmRegion3, EmRegion3_MET, ScaledDesign)
+EnsPredRegion4 <- PredictBoth(EmRegion4, EmRegion4_MET, ScaledDesign)
+EnsPredRegion5 <- PredictBoth(EmRegion5, EmRegion5_MET, ScaledDesign)
+EnsPredRegion6 <- PredictBoth(EmRegion6, EmRegion6_MET, ScaledDesign)
+EnsPredRegion7 <- PredictBoth(EmRegion7, EmRegion7_MET, ScaledDesign)
+EnsPredRegion8 <- PredictBoth(EmRegion8, EmRegion8_MET, ScaledDesign)
+
 # N+S (R1+R2)
+
+
 
 # W+E (R3+R4)
 
