@@ -1,6 +1,9 @@
 # Experiment using each of the left-out runs as the 'truth' in turn
 # and seeing how well we can identify this
 
+# Load required packages, functions
+source("papers/raikoke/0_Source.R")
+
 # Define observations using each of the 250 left out runs
 # Calculate implausibility using different % error
 # Assess how often the different metrics rule out the truth
