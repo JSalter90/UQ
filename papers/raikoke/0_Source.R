@@ -125,32 +125,83 @@ PredictBoth <- function(em1, em2, Design){
 }
 
 
-# History matching experiment, treating each left-out run as observations in turn
-PseudoExperiment <- function(tData, val_inds, em_pred, obs_error){
+#' History matching experiment, treating each left-out run as observations in turn
+#'
+#' Works for single or multiple outputs, loops over all validation points
+#'
+#' @param tData design matrix, including output in column `LogTotal`. Can be a list for multiple outputs.
+#' @param val_inds vector corresponding to left-out points when fitting emulator. Can be a list.
+#' @param em_pred emulator predictions (containing `$Mean`, `$SD`) corresponding to `tData`. Can be a list.
+#' @param obs_error vector of observation error variances corresponding to each output
+#' @param kmax kth max implausibility, defaults to 1 (i.e. take max implausibility across outputs)
+#'
+#' @return \item{overall_impl}{Overall implausibility for each of the left-out runs}
+#' \item{overall_size}{Size of overall NROY (across the left-out runs) in each experiment}
+#' \item{total_matches}{For each left-out run in turn, number of METs for which this point is in NROY}
+#' \item{pseudo_size}{Size of pseudo NROY in each experiment}
+#' \item{cons_size}{Size of conservative NROY in each experiment}
+#'
+#' @export
+PseudoExperiment <- function(tData, val_inds, em_pred, obs_error, kmax = 1){
   
-  n <- length(val_inds)
-  val_data <- tData[val_inds,]
+  if (is.list(tData)){
+    ell <- length(tData)
+    stopifnot(ell == length(em_pred)) # checking provided same number of sets of predictions as number of outputs
+    stopifnot(ell == length(val_inds)) # checking provided validation indices for each output
+    stopifnot(ell == length(obs_error)) # checking provided obs error for each output
+  }
   
+  else {
+    ell <- 1
+  }
+  
+  if (ell == 1){
+    tData <- list(tData) # converting to list so can use common code below for all ell
+    val_inds <- list(val_inds)
+    em_pred <- list(em_pred)
+  }
+  
+  n <- length(val_inds[[1]])
+  
+  val_data <- list()
+  for (k in 1:ell){
+    val_data[[k]] <- tData[[k]][val_inds[[k]],]
+  }
+
   overall_impl <- numeric(n) # implausibility of assumed obs in each experiment, for overall emulator
   total_matches <- numeric(n) # how many METs are considered not implausible, in each experiment
   overall_size <- pseudo_size <- cons_size <- numeric(n) # size of the different spaces
   
   for (i in 1:n){
-    pseudo_obs <- val_data$LogTotal[i]
-    
+    pseudo_obs <- numeric(ell)
+    for (k in 1:ell){
+      pseudo_obs[k] <- val_data[[k]]$LogTotal[i]
+    }
+
     # Calculate overall implausibility
-    overall_impl[i] <- abs(em_pred$overall$Mean[val_inds[i]] - pseudo_obs) / sqrt(em_pred$overall$SD[val_inds[i]]^2 + obs_error)
-    
-    # Size of overall NROY space
-    impl_all <- (abs(em_pred$overall$Mean - pseudo_obs) / sqrt(em_pred$overall$SD^2 + obs_error))[val_inds]
-    overall_size[i] <- sum(impl_all < 3) / n 
-    
-    # Calculate implausibility for each MET
-    impl_MET <- matrix(0, n, 18)
-    for (j in 1:18){
-      impl_MET[,j] <- abs(em_pred$met[[j]]$Mean[val_inds] - pseudo_obs) / sqrt(em_pred$met[[j]]$SD[val_inds]^2 + obs_error)
+    tmp_impl <- numeric(ell)
+    for (k in 1:ell){
+      tmp_impl[k] <- abs(em_pred[[k]]$overall$Mean[val_inds[[k]][i]] - pseudo_obs[k]) / sqrt(em_pred[[k]]$overall$SD[val_inds[[k]][i]]^2 + obs_error[k])
     }
     
+    overall_impl[i] <- kth_max(tmp_impl, k = kmax)
+    
+    # Size of overall NROY space
+    impl_all <- matrix(NA, n, ell)
+    for (k in 1:ell){
+      impl_all[,k] <- (abs(em_pred[[k]]$overall$Mean - pseudo_obs[k]) / sqrt(em_pred[[k]]$overall$SD^2 + obs_error[k]))[val_inds[[k]]]
+    }
+    impl_all <- apply(impl_all, 1, kth_max, k = kmax)
+    overall_size[i] <- sum(impl_all < 3) / n
+    
+    # Calculate implausibility for each MET
+    impl_MET <- array(0, n, 18, ell)
+    for (k in 1:ell){
+      for (j in 1:18){
+        impl_MET[,j,k] <- abs(em_pred[[k]]$met[[j]]$Mean[val_inds[[k]]] - pseudo_obs[k]) / sqrt(em_pred[[k]]$met[[j]]$SD[val_inds[[k]]]^2 + obs_error[k])
+      }
+    }
+    impl_MET[,j] <- apply(impl_MET, c(1,2), kth_max, k = kmax)
     total_matches[i] <- sum(impl_MET[i,] < bound) # count how many METs the chosen 'obs' are in NROY for 
     
     # Size of pseudo NROY space
@@ -167,5 +218,10 @@ PseudoExperiment <- function(tData, val_inds, em_pred, obs_error){
               cons_size))
 }
 
+
+kth_max <- function(x,k) {
+  sorted_values <- sort(x, decreasing = TRUE)
+  sorted_values[k]  # Returns the second maximum
+}
 
 
