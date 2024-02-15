@@ -28,15 +28,15 @@ for (i in 1:ncol(CalDesignScaled)){
 # Load in emulators
 # For the totals at T3, T5 and T7 these are available in data folder
 # For others, need to fit and store locally
-EmT3 <- load_ExUQmogp('papers/raikoke/data/EmT3')
-EmT5 <- load_ExUQmogp('papers/raikoke/data/EmT5')
-EmT7 <- load_ExUQmogp('papers/raikoke/data/EmT7')
+EmT3 <- load_ExUQmogp('papers/raikoke/data/EmT3/train')
+EmT5 <- load_ExUQmogp('papers/raikoke/data/EmT5/train')
+EmT7 <- load_ExUQmogp('papers/raikoke/data/EmT7/train')
 
-EmT3_MET <- LoadMulti('papers/raikoke/data/EmT3_MET')
-EmT5_MET <- LoadMulti('papers/raikoke/data/EmT5_MET')
-EmT7_MET <- LoadMulti('papers/raikoke/data/EmT7_MET')
+EmT3_MET <- LoadMulti('papers/raikoke/data/EmT3_MET', 'train')
+EmT5_MET <- LoadMulti('papers/raikoke/data/EmT5_MET', 'train')
+EmT7_MET <- LoadMulti('papers/raikoke/data/EmT7_MET', 'train')
 
-# Overall
+# Regions, overall
 EmRegion1 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region1')
 EmRegion2 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region2')
 EmRegion3 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region3')
@@ -47,14 +47,14 @@ EmRegion7 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region7')
 EmRegion8 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region8')
 
 # By MET
-EmRegion1_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region1', 'region1')
-EmRegion2_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region2', 'region2')
-EmRegion3_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region3', 'region3')
-EmRegion4_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region4', 'region4')
-EmRegion5_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region5', 'region5')
-EmRegion6_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region6', 'region6')
-EmRegion7_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region7', 'region7')
-EmRegion8_MET <- LoadMulti('papers/raikoke/data/EmRegions_MET/region8', 'region8')
+EmRegion1_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region1', 'region1')
+EmRegion2_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region2', 'region2')
+EmRegion3_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region3', 'region3')
+EmRegion4_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region4', 'region4')
+EmRegion5_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region5', 'region5')
+EmRegion6_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region6', 'region6')
+EmRegion7_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region7', 'region7')
+EmRegion8_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region8', 'region8')
 
 # Predict at T3/T5/T7 using a) overall emulator and b) each of the 18 MET emulators
 # Each of these objects is relatively large (mean, variance at N points for 19 emulators), hence not stored in Github
@@ -113,7 +113,7 @@ NROY_T7 <- data.frame(Overall = implT3 < bound & implT5 < bound & implT7 < bound
                       Conservative = apply(implT3_MET < bound, 1, sum) > 0 & apply(implT5_MET < bound, 1, sum) > 0 & apply(implT7_MET < bound, 1, sum) > 0,
                       Pseudo = apply(implT3_MET < bound, 1, sum) >= 9 & apply(implT5_MET < bound, 1, sum) >= 9 & apply(implT7_MET < bound, 1, sum) >= 9)
 
-# N+S (R1, R2) FIX OBS
+# N+S (R1, R2)
 implR1 <- abs(scale_output + PredR1$overall$Mean - subset(obs, Type == 'R1')$Mean) / sqrt(PredR1$overall$SD^2 + subset(obs, Type == 'R1')$Var)
 implR2 <- abs(scale_output + PredR2$overall$Mean - subset(obs, Type == 'R2')$Mean) / sqrt(PredR2$overall$SD^2 + subset(obs, Type == 'R2')$Var)
 
@@ -132,7 +132,7 @@ NROY_NS <- data.frame(Overall = implR1 < bound & implR2 < bound,
                       Conservative = apply(implR1_MET < bound & implR2_MET < bound, 1, sum) > 0,
                       Pseudo = apply(implR1_MET < bound & implR2_MET < bound, 1, sum) >= 9)
 
-# W+E (R3, R4) FIX OBS
+# W+E (R3, R4)
 implR3 <- abs(scale_output + PredR3$overall$Mean - subset(obs, Type == 'R3')$Mean) / sqrt(PredR3$overall$SD^2 + subset(obs, Type == 'R3')$Var)
 implR4 <- abs(scale_output + PredR4$overall$Mean - subset(obs, Type == 'R4')$Mean) / sqrt(PredR4$overall$SD^2 + subset(obs, Type == 'R4')$Var)
 
