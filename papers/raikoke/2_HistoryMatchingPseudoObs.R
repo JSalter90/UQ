@@ -113,6 +113,33 @@ Exp_WE_var001 <- PseudoExperiment(list(tData_regions[[3]], tData_regions[[4]]),
                                   obs_error = 0.01*c(obs_varR3, obs_varR4))
 
 # 4 regions (R5+R6+R7+R8)
+Exp_4R_var1 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
+                                list(val_inds, val_inds, val_inds, val_inds),
+                                list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
+                                obs_error = c(obs_varR5, obs_varR6, obs_varR7, obs_varR8))
+Exp_4R_var01 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
+                                 list(val_inds, val_inds, val_inds, val_inds),
+                                 list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
+                                 obs_error = 0.1*c(obs_varR5, obs_varR6, obs_varR7, obs_varR8))
+Exp_4R_var001 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
+                                  list(val_inds, val_inds, val_inds, val_inds),
+                                  list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
+                                  obs_error = 0.01*c(obs_varR5, obs_varR6, obs_varR7, obs_varR8))
 
-# 3/4 regions
+# 3/4 regions, i.e. use 2nd max impl across the 4 regions (i.e. 1 allowed to 'fail')
+Exp_4Rk2_var1 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
+                                list(val_inds, val_inds, val_inds, val_inds),
+                                list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
+                                obs_error = c(obs_varR5, obs_varR6, obs_varR7, obs_varR8),
+                                kmax = 2)
+Exp_4Rk2_var01 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
+                                 list(val_inds, val_inds, val_inds, val_inds),
+                                 list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
+                                 obs_error = 0.1*c(obs_varR5, obs_varR6, obs_varR7, obs_varR8),
+                                 kmax = 2)
+Exp_4Rk2_var001 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
+                                  list(val_inds, val_inds, val_inds, val_inds),
+                                  list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
+                                  obs_error = 0.01*c(obs_varR5, obs_varR6, obs_varR7, obs_varR8),
+                                  kmax = 2)
 
