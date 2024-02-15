@@ -32,6 +32,16 @@ parRanges <- data.frame(parameter = colnames(design)[3:13],
                         lower = c(9,0.5,0.33,minMER,1350,0,9,0.0025,100,0.27,log(minMER)),
                         upper = c(17,20,3,maxMER,2500,17,15,2.75,900,1.74,log(maxMER)))
 
+# Observation information
+# For history matching, require estimated obs (mean/median), observation error variance
+# $Mean gives mean (on log scale), $Var gives estimated variance (on log scale)
+obs <- data.frame(Type = c('T3', 'T5', 'T7', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8'),
+                  Mean = c(),
+                  Var = c())
+
+# Just load this in
+obs <- readRDS('papers/raikoke/data/obs.rds')
+
 
 
 #### Additional functions for this work specifically ####
