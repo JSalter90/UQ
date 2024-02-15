@@ -15,9 +15,9 @@ tDataT3 <- readRDS("papers/raikoke/data/tDataT3.rds")
 # Load in emulator predictions across the 1000 ensemble members (only need the 250 val points)
 EnsPredT3 <- readRDS("papers/raikoke/data/EnsPredT3.rds")
 
-Exp_T3_var1 <- PseudoExperiment(tDataT3, val_inds, EnsPredT3, obs_error = 1 * obs_var[1])
-Exp_T3_var01 <- PseudoExperiment(tDataT3, val_inds, EnsPredT3, obs_error = 0.1 * obs_var[1])
-Exp_T3_var001 <- PseudoExperiment(tDataT3, val_inds, EnsPredT3, obs_error = 0.01 * obs_var[1])
+Exp_T3_var1 <- PseudoExperiment(tDataT3, val_inds, EnsPredT3, obs_error = 1 * subset(obs, Type == 'T3')$Var)
+Exp_T3_var01 <- PseudoExperiment(tDataT3, val_inds, EnsPredT3, obs_error = 0.1 * subset(obs, Type == 'T3')$Var)
+Exp_T3_var001 <- PseudoExperiment(tDataT3, val_inds, EnsPredT3, obs_error = 0.01 * subset(obs, Type == 'T3')$Var)
 
 # How often rule out the truth using overall emulator:
 sum(Exp_T3_var1$overall_impl > 3)
@@ -43,16 +43,16 @@ data.frame(Type = c('Pseudo', 'Overall', 'Cons'),
 # T5
 tDataT5 <- readRDS("papers/raikoke/data/tDataT5.rds")
 EnsPredT5 <- readRDS("papers/raikoke/data/EnsPredT5.rds")
-Exp_T5_var1 <- PseudoExperiment(tDataT5, val_inds, EnsPredT5, obs_error = 1 * obs_var[2])
-Exp_T5_var01 <- PseudoExperiment(tDataT5, val_inds, EnsPredT5, obs_error = 0.1 * obs_var[2])
-Exp_T5_var001 <- PseudoExperiment(tDataT5, val_inds, EnsPredT5, obs_error = 0.01 * obs_var[2])
+Exp_T5_var1 <- PseudoExperiment(tDataT5, val_inds, EnsPredT5, obs_error = 1 * subset(obs, Type == 'T5')$Var)
+Exp_T5_var01 <- PseudoExperiment(tDataT5, val_inds, EnsPredT5, obs_error = 0.1 * subset(obs, Type == 'T5')$Var)
+Exp_T5_var001 <- PseudoExperiment(tDataT5, val_inds, EnsPredT5, obs_error = 0.01 * subset(obs, Type == 'T5')$Var)
 
 # T7
 tDataT7 <- readRDS("papers/raikoke/data/tDataT7.rds")
 EnsPredT7 <- readRDS("papers/raikoke/data/EnsPredT7.rds")
-Exp_T7_var1 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 1 * obs_var[3])
-Exp_T7_var01 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 0.1 * obs_var[3])
-Exp_T7_var001 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 0.01 * obs_var[3])
+Exp_T7_var1 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 1 * subset(obs, Type == 'T7')$Var)
+Exp_T7_var01 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 0.1 * subset(obs, Type == 'T7')$Var)
+Exp_T7_var001 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 0.01 * subset(obs, Type == 'T7')$Var)
 
 # Regions
 tData_regions <- readRDS("papers/raikoke/data/tData_regions.rds")
@@ -91,58 +91,58 @@ EnsPredRegion8 <- PredictBoth(EmRegion8, EmRegion8_MET, ScaledDesign)
 Exp_NS_var1 <- PseudoExperiment(list(tData_regions[[1]], tData_regions[[2]]),
                                 list(val_inds, val_inds),
                                 list(EnsPredRegion1, EnsPredRegion2),
-                                obs_error = c(obs_varR1, obs_varR2))
+                                obs_error = c(subset(obs, Type == 'R1')$Var, subset(obs, Type == 'R2')$Var))
 Exp_NS_var01 <- PseudoExperiment(list(tData_regions[[1]], tData_regions[[2]]),
                                 list(val_inds, val_inds),
                                 list(EnsPredRegion1, EnsPredRegion2),
-                                obs_error = 0.1*c(obs_varR1, obs_varR2))
+                                obs_error = 0.1*c(subset(obs, Type == 'R1')$Var, subset(obs, Type == 'R2')$Var))
 Exp_NS_var001 <- PseudoExperiment(list(tData_regions[[1]], tData_regions[[2]]),
                                 list(val_inds, val_inds),
                                 list(EnsPredRegion1, EnsPredRegion2),
-                                obs_error = 0.01*c(obs_varR1, obs_varR2))
+                                obs_error = 0.01*c(subset(obs, Type == 'R1')$Var, subset(obs, Type == 'R2')$Var))
 
 # W+E (R3+R4)
 Exp_WE_var1 <- PseudoExperiment(list(tData_regions[[3]], tData_regions[[4]]),
                                 list(val_inds, val_inds),
                                 list(EnsPredRegion3, EnsPredRegion4),
-                                obs_error = c(obs_varR3, obs_varR4))
+                                obs_error = c(subset(obs, Type == 'R3')$Var, subset(obs, Type == 'R4')$Var))
 Exp_WE_var01 <- PseudoExperiment(list(tData_regions[[3]], tData_regions[[4]]),
                                  list(val_inds, val_inds),
                                  list(EnsPredRegion3, EnsPredRegion4),
-                                 obs_error = 0.1*c(obs_varR3, obs_varR4))
+                                 obs_error = 0.1*c(subset(obs, Type == 'R3')$Var, subset(obs, Type == 'R4')$Var))
 Exp_WE_var001 <- PseudoExperiment(list(tData_regions[[3]], tData_regions[[4]]),
                                   list(val_inds, val_inds),
                                   list(EnsPredRegion3, EnsPredRegion4),
-                                  obs_error = 0.01*c(obs_varR3, obs_varR4))
+                                  obs_error = 0.01*c(subset(obs, Type == 'R3')$Var, subset(obs, Type == 'R4')$Var))
 
 # 4 regions (R5+R6+R7+R8)
 Exp_4R_var1 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
                                 list(val_inds, val_inds, val_inds, val_inds),
                                 list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
-                                obs_error = c(obs_varR5, obs_varR6, obs_varR7, obs_varR8))
+                                obs_error = c(subset(obs, Type == 'R5')$Var, subset(obs, Type == 'R6')$Var, subset(obs, Type == 'R7')$Var, subset(obs, Type == 'R8')$Var))
 Exp_4R_var01 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
                                  list(val_inds, val_inds, val_inds, val_inds),
                                  list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
-                                 obs_error = 0.1*c(obs_varR5, obs_varR6, obs_varR7, obs_varR8))
+                                 obs_error = 0.1*c(subset(obs, Type == 'R5')$Var, subset(obs, Type == 'R6')$Var, subset(obs, Type == 'R7')$Var, subset(obs, Type == 'R8')$Var))
 Exp_4R_var001 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
                                   list(val_inds, val_inds, val_inds, val_inds),
                                   list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
-                                  obs_error = 0.01*c(obs_varR5, obs_varR6, obs_varR7, obs_varR8))
+                                  obs_error = 0.01*c(subset(obs, Type == 'R5')$Var, subset(obs, Type == 'R6')$Var, subset(obs, Type == 'R7')$Var, subset(obs, Type == 'R8')$Var))
 
 # 3/4 regions, i.e. use 2nd max impl across the 4 regions (i.e. 1 allowed to 'fail')
 Exp_4Rk2_var1 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
                                 list(val_inds, val_inds, val_inds, val_inds),
                                 list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
-                                obs_error = c(obs_varR5, obs_varR6, obs_varR7, obs_varR8),
+                                obs_error = c(subset(obs, Type == 'R5')$Var, subset(obs, Type == 'R6')$Var, subset(obs, Type == 'R7')$Var, subset(obs, Type == 'R8')$Var),
                                 kmax = 2)
 Exp_4Rk2_var01 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
                                  list(val_inds, val_inds, val_inds, val_inds),
                                  list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
-                                 obs_error = 0.1*c(obs_varR5, obs_varR6, obs_varR7, obs_varR8),
+                                 obs_error = 0.1*c(subset(obs, Type == 'R5')$Var, subset(obs, Type == 'R6')$Var, subset(obs, Type == 'R7')$Var, subset(obs, Type == 'R8')$Var),
                                  kmax = 2)
 Exp_4Rk2_var001 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
                                   list(val_inds, val_inds, val_inds, val_inds),
                                   list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
-                                  obs_error = 0.01*c(obs_varR5, obs_varR6, obs_varR7, obs_varR8),
+                                  obs_error = 0.01*c(subset(obs, Type == 'R5')$Var, subset(obs, Type == 'R6')$Var, subset(obs, Type == 'R7')$Var, subset(obs, Type == 'R8')$Var),
                                   kmax = 2)
 
