@@ -1,19 +1,8 @@
-library(fields)
-library(lhs)
-library(ggplot2)
-library(parallel)
-library(RobustGaSP)
-library(GenSA)
-library(tensor)
-library(far)
-library(shape)
+source('code/rotation_functions.R')
+source('code/FastHM.R')
 
-source('~/ExeterUQ/BuildEmulator/DannyDevelopment.R')
-source('~/ExeterUQ/BuildEmulator/AutoLMcode.R')
-source('~/ExeterUQ/BuildEmulator/CustomPredict.R')
+# From ExeterUQ https://github.com/BayesExeter/ExeterUQ - edit path to read this
 source('~/ExeterUQ/BuildEmulator/BuildEmulator.R')
-source('rotation_functions.R')
-source('FastHM.R')
 
 #' Building a single GaSP emulator for basis output
 #' 
