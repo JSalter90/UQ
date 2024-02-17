@@ -25,6 +25,10 @@ for (i in 1:ncol(CalDesignScaled)){
   CalDesignScaled[,i] <- CalDesignScaled[,i] - 1
 }
 
+# In general, scale down output by 0.95 when compare to observations
+# All on log scale here
+scale_output <- log(0.95)
+
 # Load in emulators
 # For the totals at T3, T5 and T7 these are available in data folder
 # For others, need to fit and store locally
