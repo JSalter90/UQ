@@ -1,12 +1,17 @@
+# Load required packages, functions
+source("papers/raikoke/0_Source.R")
+
 # Create some plots
 tDataT3 <- readRDS("papers/raikoke/data/tDataT3.rds")
-tDataT5 <- readRDS("papers/raikoke/data/tDataT3.rds")
-tDataT7 <- readRDS("papers/raikoke/data/tDataT3.rds")
-tData_regions <- readRDS("papers/raikoke/data/tDataT3.rds")
+tDataT5 <- readRDS("papers/raikoke/data/tDataT5.rds")
+tDataT7 <- readRDS("papers/raikoke/data/tDataT7.rds")
+tData_regions <- readRDS("papers/raikoke/data/tData_regions.rds")
 
 # For validation plots, see 1_Emulation.R
 
 # Plotting T3 total vs T7 total
+scale_output <- -0.05
+
 tmp <- data.frame(T3 = tDataT3$LogTotal + scale_output,
                   T7 = tDataT7$LogTotal + scale_output,
                   m = as.factor(design$MET))
@@ -25,6 +30,18 @@ ggplot(data = tmp, aes(x = T3, y = T7, col = m)) +
   geom_hline(data = tmp_obs_sd, aes(yintercept = T7), linetype = 'dashed') +
   labs(x = 'Log total ash column load, T3', y = 'Log total ash column load, T7')
 
+
+# Alternative colour schemes
+ggplot(data = tmp, aes(x = T3, y = T7, col = m)) +
+  geom_point() +
+  scale_color_viridis_d()
+
+ggplot(data = subset(tmp, m %in% 1:16), aes(x = T3, y = T7)) +
+  geom_point() +
+  facet_wrap(vars(m)) +
+  geom_abline(intercept = -3.871, slope = 1.070)
+
+lm(T7 ~ T3, data = tmp)
 
 # Plotting N vs S, W vs E
 tmp <- data.frame(Region1 = tData_regions[[1]]$LogTotal + scale_output,
