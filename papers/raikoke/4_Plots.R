@@ -2,94 +2,75 @@
 source("papers/raikoke/0_Source.R")
 
 # Create some plots
+# For validation plots, see 1_Emulation.R
+
 tDataT3 <- readRDS("papers/raikoke/data/tDataT3.rds")
 tDataT5 <- readRDS("papers/raikoke/data/tDataT5.rds")
 tDataT7 <- readRDS("papers/raikoke/data/tDataT7.rds")
 tData_regions <- readRDS("papers/raikoke/data/tData_regions.rds")
 
-# For validation plots, see 1_Emulation.R
+# Find 95% intervals
+obs$Lower <- obs$Mean - 1.96*sqrt(obs$Var)
+obs$Upper <- obs$Mean + 1.96*sqrt(obs$Var)
+
+# In general, scale down output by 0.95 when compare to observations
+# All on log scale here
+scale_output <- log(0.95)
 
 # Plotting T3 total vs T7 total
-scale_output <- -0.05
+plot_data <- data.frame(T3 = tDataT3$LogTotal + scale_output,
+                        T7 = tDataT7$LogTotal + scale_output,
+                        m = as.factor(design$MET))
 
-tmp <- data.frame(T3 = tDataT3$LogTotal + scale_output,
-                  T7 = tDataT7$LogTotal + scale_output,
-                  m = as.factor(design$MET))
-tmp_obs <- data.frame(T3 = log(sum(all_obs[[3]]$Ash_conc_median)),
-                      T7 = log(sum(all_obs[[7]]$Ash_conc_median)))
-obs_sd_log <- c(max((tmp_obs[1] - log(sum(all_obs[[3]]$Percentile_10th))) / qnorm(0.9), (log(sum(all_obs[[3]]$Percentile_90th)) - tmp_obs[1])) / qnorm(0.9),
-                max((tmp_obs[2] - log(sum(all_obs[[7]]$Percentile_10th))) / qnorm(0.9), (log(sum(all_obs[[7]]$Percentile_90th)) - tmp_obs[2])) / qnorm(0.9))
-tmp_obs_sd <- data.frame(T3 = c(tmp_obs$T3 + qnorm(0.005)*obs_sd_log[1], tmp_obs$T3 + qnorm(0.995)*obs_sd_log[1]),
-                         T7 = c(tmp_obs$T7 + qnorm(0.005)*obs_sd_log[2], tmp_obs$T7 + qnorm(0.995)*obs_sd_log[2]))
+obsT3 <- subset(obs, Type == 'T3')
+obsT7 <- subset(obs, Type == 'T7')
 
 ggplot(data = tmp, aes(x = T3, y = T7, col = m)) +
   geom_point() +
-  geom_vline(data = tmp_obs, aes(xintercept = T3)) +
-  geom_hline(data = tmp_obs, aes(yintercept = T7)) +
-  geom_vline(data = tmp_obs_sd, aes(xintercept = T3), linetype = 'dashed') +
-  geom_hline(data = tmp_obs_sd, aes(yintercept = T7), linetype = 'dashed') +
+  geom_vline(xintercept = c(obsT3$Mean, obsT3$Lower, obsT3$Upper), linetype = c('solid', 'dashed', 'dashed')) +
+  geom_hline(yintercept = c(obsT7$Mean, obsT7$Lower, obsT7$Upper), linetype = c('solid', 'dashed', 'dashed')) +
   labs(x = 'Log total ash column load, T3', y = 'Log total ash column load, T7')
 
-
 # Alternative colour schemes
-ggplot(data = tmp, aes(x = T3, y = T7, col = m)) +
+ggplot(data = plot_data, aes(x = T3, y = T7, col = m)) +
   geom_point() +
-  scale_color_viridis_d()
+  scale_color_viridis_d(option = 'D')
 
-ggplot(data = subset(tmp, m %in% 1:16), aes(x = T3, y = T7)) +
+ggplot(data = subset(plot_data, m %in% 1:16), aes(x = T3, y = T7)) +
   geom_point() +
   facet_wrap(vars(m)) +
   geom_abline(intercept = -3.871, slope = 1.070)
 
-lm(T7 ~ T3, data = tmp)
-
 # Plotting N vs S, W vs E
-tmp <- data.frame(Region1 = tData_regions[[1]]$LogTotal + scale_output,
-                  Region2 = tData_regions[[2]]$LogTotal + scale_output,
-                  m = as.factor(design$MET),
-                  Region = 'North_South')
+plot_data <- data.frame(Region1 = tData_regions[[1]]$LogTotal + scale_output,
+                        Region2 = tData_regions[[2]]$LogTotal + scale_output,
+                        m = as.factor(design$MET),
+                        Region = 'North_South')
+obsR1 <- subset(obs, Type == 'R1')
+obsR2 <- subset(obs, Type == 'R2')
 
-ns_line <- 48
-obsR1 <- subset(all_obs[[3]], Lat >= ns_line)
-obsR2 <- subset(all_obs[[3]], Lat < ns_line)
-tmp_obs <- data.frame(Region1 = log(sum(obsR1$Ash_conc_median)),
-                      Region2 = log(sum(obsR2$Ash_conc_median)))
-obs_sd_log <- c(max((tmp_obs$Region1 - log(sum(obsR1$Percentile_10th))) / qnorm(0.9), (log(sum(obsR1$Percentile_90th)) - tmp_obs$Region1)) / qnorm(0.9),
-                max((tmp_obs$Region2 - log(sum(obsR2$Percentile_10th))) / qnorm(0.9), (log(sum(obsR2$Percentile_90th)) - tmp_obs$Region2)) / qnorm(0.9))
-tmp_obs_sd <- data.frame(Region1 = c(tmp_obs$Region1 + qnorm(0.005)*obs_sd_log[1], tmp_obs$Region1 + qnorm(0.995)*obs_sd_log[1]),
-                         Region2 = c(tmp_obs$Region2 + qnorm(0.005)*obs_sd_log[2], tmp_obs$Region2 + qnorm(0.995)*obs_sd_log[2]))
-
-plot1 <- ggplot(data = tmp, aes(x = Region1, y = Region2, col = m)) +
+plot1 <- ggplot(data = plot_data, aes(x = Region1, y = Region2, col = m)) +
   geom_point() +
-  geom_vline(data = tmp_obs, aes(xintercept = Region1)) +
-  geom_hline(data = tmp_obs, aes(yintercept = Region2)) +
-  geom_vline(data = tmp_obs_sd, aes(xintercept = Region1), linetype = 'dashed') +
-  geom_hline(data = tmp_obs_sd, aes(yintercept = Region2), linetype = 'dashed') +
+  scale_color_viridis_d(option = 'D') +
+  geom_vline(xintercept = c(obsR1$Mean, obsR1$Lower, obsR1$Upper), linetype = c('solid', 'dashed', 'dashed')) +
+  geom_hline(yintercept = c(obsR2$Mean, obsR2$Lower, obsR2$Upper), linetype = c('solid', 'dashed', 'dashed')) +
   theme(legend.position = 'none') +
   xlim(21.25,31.85) +
   ylim(23.25,31.75) +
   labs(x = 'Log total ash column load, North', y = 'Log total ash column load, South')
 
-tmp <- data.frame(Region1 = tData_regions[[3]]$LogTotal + scale_output,
-                  Region2 = tData_regions[[4]]$LogTotal + scale_output,
-                  m = as.factor(design$MET),
-                  Region = 'West_East')
-we_line <- mean(all_obs[[3]]$Lon)
-obsR3 <- subset(all_obs[[3]], Lon <= we_line)
-obsR4 <- subset(all_obs[[3]], Lon > we_line)
-tmp_obs <- data.frame(Region1 = log(sum(obsR3$Ash_conc_median)),
-                      Region2 = log(sum(obsR4$Ash_conc_median)))
-obs_sd_log <- c(max((tmp_obs$Region1 - log(sum(obsR3$Percentile_10th))) / qnorm(0.9), (log(sum(obsR3$Percentile_90th)) - tmp_obs$Region1)) / qnorm(0.9),
-                max((tmp_obs$Region2 - log(sum(obsR4$Percentile_10th))) / qnorm(0.9), (log(sum(obsR4$Percentile_90th)) - tmp_obs$Region2)) / qnorm(0.9))
-tmp_obs_sd <- data.frame(Region1 = c(tmp_obs$Region1 + qnorm(0.005)*obs_sd_log[1], tmp_obs$Region1 + qnorm(0.995)*obs_sd_log[1]),
-                         Region2 = c(tmp_obs$Region2 + qnorm(0.005)*obs_sd_log[2], tmp_obs$Region2 + qnorm(0.995)*obs_sd_log[2]))
+plot_data2 <- data.frame(Region1 = tData_regions[[3]]$LogTotal + scale_output,
+                         Region2 = tData_regions[[4]]$LogTotal + scale_output,
+                         m = as.factor(design$MET),
+                         Region = 'West_East')
+obsR3 <- subset(obs, Type == 'R3')
+obsR4 <- subset(obs, Type == 'R4')
 
-plot2 <- ggplot(data = tmp, aes(x = Region1, y = Region2, col = m)) +
+plot2 <- ggplot(data = plot_data2, aes(x = Region1, y = Region2, col = m)) +
   geom_point() +
-  geom_vline(data = tmp_obs, aes(xintercept = Region1)) +
-  geom_hline(data = tmp_obs, aes(yintercept = Region2)) +
-  geom_vline(data = tmp_obs_sd, aes(xintercept = Region1), linetype = 'dashed') +
-  geom_hline(data = tmp_obs_sd, aes(yintercept = Region2), linetype = 'dashed') +
+  scale_color_viridis_d(option = 'D') +
+  geom_vline(xintercept = c(obsR3$Mean, obsR3$Lower, obsR3$Upper), linetype = c('solid', 'dashed', 'dashed')) +
+  geom_hline(yintercept = c(obsR4$Mean, obsR4$Lower, obsR4$Upper), linetype = c('solid', 'dashed', 'dashed')) +
   xlim(21.25,31.85) +
   ylim(23.25,31.75) +
   labs(x = 'Log total ash column load, West', y = 'Log total ash column load, East')
@@ -97,58 +78,38 @@ plot2 <- ggplot(data = tmp, aes(x = Region1, y = Region2, col = m)) +
 plot_grid(plot1, plot2, nrow = 1, rel_widths = c(0.95,1))
 
 # The 4 region split
-tmp <- data.frame(Region1 = tData_regions[[5]]$LogTotal + scale_output,
-                  Region2 = tData_regions[[8]]$LogTotal + scale_output,
-                  m = as.factor(design$MET),
-                  Region = 'NW_SW')
+plot_data <- data.frame(Region1 = tData_regions[[5]]$LogTotal + scale_output,
+                        Region2 = tData_regions[[8]]$LogTotal + scale_output,
+                        m = as.factor(design$MET),
+                        Region = 'NW_SW')
+obsR5 <- subset(obs, Type == 'R5')
+obsR8 <- subset(obs, Type == 'R8')
 
-obsR5 <- subset(all_obs[[3]], Lat >= ns_line & Lon <= we_line)
-obsR6 <- subset(all_obs[[3]], Lat >= ns_line & Lon > we_line)
-obsR7 <- subset(all_obs[[3]], Lat < ns_line & Lon > we_line)
-obsR8 <- subset(all_obs[[3]], Lat < ns_line & Lon <= we_line)
-
-tmp_obs <- data.frame(Region1 = log(sum(obsR5$Ash_conc_median)),
-                      Region2 = log(sum(obsR8$Ash_conc_median)))
-obs_sd_log <- c(max((tmp_obs$Region1 - log(sum(obsR5$Percentile_10th))) / qnorm(0.9), (log(sum(obsR5$Percentile_90th)) - tmp_obs$Region1)) / qnorm(0.9),
-                max((tmp_obs$Region2 - log(sum(obsR8$Percentile_10th))) / qnorm(0.9), (log(sum(obsR8$Percentile_90th)) - tmp_obs$Region2)) / qnorm(0.9))
-tmp_obs_sd <- data.frame(Region1 = c(tmp_obs$Region1 + qnorm(0.005)*obs_sd_log[1], tmp_obs$Region1 + qnorm(0.995)*obs_sd_log[1]),
-                         Region2 = c(tmp_obs$Region2 + qnorm(0.005)*obs_sd_log[2], tmp_obs$Region2 + qnorm(0.995)*obs_sd_log[2]))
-
-plot1 <- ggplot(data = tmp, aes(x = Region1, y = Region2, col = m)) +
+plot1 <- ggplot(data = plot_data, aes(x = Region1, y = Region2, col = m)) +
   geom_point() +
-  geom_vline(data = tmp_obs, aes(xintercept = Region1)) +
-  geom_hline(data = tmp_obs, aes(yintercept = Region2)) +
-  geom_vline(data = tmp_obs_sd, aes(xintercept = Region1), linetype = 'dashed') +
-  geom_hline(data = tmp_obs_sd, aes(yintercept = Region2), linetype = 'dashed') +
+  scale_color_viridis_d(option = 'D') +
+  geom_vline(xintercept = c(obsR5$Mean, obsR5$Lower, obsR5$Upper), linetype = c('solid', 'dashed', 'dashed')) +
+  geom_hline(yintercept = c(obsR8$Mean, obsR8$Lower, obsR8$Upper), linetype = c('solid', 'dashed', 'dashed')) +
   theme(legend.position = 'none') +
   xlim(20,31.5) +
   ylim(22.25,31) +
   labs(x = 'Log total ash column load, NW', y = 'Log total ash column load, SW')
 
-tmp <- data.frame(Region1 = tData_regions[[6]]$LogTotal + scale_output,
-                  Region2 = tData_regions[[7]]$LogTotal + scale_output,
-                  m = as.factor(design$MET),
-                  Region = 'NE_SE')
-tmp_obs <- data.frame(Region1 = log(sum(obsR6$Ash_conc_median)),
-                      Region2 = log(sum(obsR7$Ash_conc_median)))
-obs_sd_log <- c(max((tmp_obs$Region1 - log(sum(obsR6$Percentile_10th))) / qnorm(0.9), (log(sum(obsR6$Percentile_90th)) - tmp_obs$Region1)) / qnorm(0.9),
-                max((tmp_obs$Region2 - log(sum(obsR7$Percentile_10th))) / qnorm(0.9), (log(sum(obsR7$Percentile_90th)) - tmp_obs$Region2)) / qnorm(0.9))
-tmp_obs_sd <- data.frame(Region1 = c(tmp_obs$Region1 + qnorm(0.005)*obs_sd_log[1], tmp_obs$Region1 + qnorm(0.995)*obs_sd_log[1]),
-                         Region2 = c(tmp_obs$Region2 + qnorm(0.005)*obs_sd_log[2], tmp_obs$Region2 + qnorm(0.995)*obs_sd_log[2]))
+plot_data2 <- data.frame(Region1 = tData_regions[[6]]$LogTotal + scale_output,
+                         Region2 = tData_regions[[7]]$LogTotal + scale_output,
+                         m = as.factor(design$MET),
+                         Region = 'NE_SE')
+obsR6 <- subset(obs, Type == 'R6')
+obsR7 <- subset(obs, Type == 'R7')
 
-plot2 <- ggplot(data = subset(tmp, Region1 > 0), aes(x = Region1, y = Region2, col = m)) +
+plot2 <- ggplot(data = subset(plot_data2, Region1 > 0), aes(x = Region1, y = Region2, col = m)) +
   geom_point() +
-  geom_vline(data = tmp_obs, aes(xintercept = Region1)) +
-  geom_hline(data = tmp_obs, aes(yintercept = Region2)) +
-  geom_vline(data = tmp_obs_sd, aes(xintercept = Region1), linetype = 'dashed') +
-  geom_hline(data = tmp_obs_sd, aes(yintercept = Region2), linetype = 'dashed') +
+  scale_color_viridis_d(option = 'D') +
+  geom_vline(xintercept = c(obsR6$Mean, obsR6$Lower, obsR6$Upper), linetype = c('solid', 'dashed', 'dashed')) +
+  geom_hline(yintercept = c(obsR7$Mean, obsR7$Lower, obsR7$Upper), linetype = c('solid', 'dashed', 'dashed')) +
   xlim(20,31.5) +
   ylim(22.25,31) +
   labs(x = 'Log total ash column load, NE', y = 'Log total ash column load, SE')
 
 plot_grid(plot1, plot2, nrow = 1, rel_widths = c(0.95,1))
-
-
-
-
 
