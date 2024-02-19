@@ -20,7 +20,9 @@ scale_output <- log(0.95)
 # Plotting T3 total vs T7 total
 plot_data <- data.frame(T3 = tDataT3$LogTotal + scale_output,
                         T7 = tDataT7$LogTotal + scale_output,
-                        m = as.factor(design$MET))
+                        m = as.factor(design$MET),
+                        logMER = design$logMER,
+                        msigU = design$m_sigU)
 
 obsT3 <- subset(obs, Type == 'T3')
 obsT7 <- subset(obs, Type == 'T7')
@@ -34,12 +36,19 @@ ggplot(data = tmp, aes(x = T3, y = T7, col = m)) +
 # Alternative colour schemes
 ggplot(data = plot_data, aes(x = T3, y = T7, col = m)) +
   geom_point() +
-  scale_color_viridis_d(option = 'D')
-
-ggplot(data = subset(plot_data, m %in% 1:16), aes(x = T3, y = T7)) +
+  scale_color_viridis_d(option = 'D') +
+  geom_vline(xintercept = c(26.75,25.8,27.55), linetype = c('solid', 'dashed', 'dashed')) +
+  geom_hline(yintercept = c(26.3,25.9,26.8), linetype = c('solid', 'dashed', 'dashed'))
+  
+ggplot(data = subset(plot_data, m %in% 1:16), aes(x = T3, y = T7, col = msigU)) +
   geom_point() +
   facet_wrap(vars(m)) +
-  geom_abline(intercept = -3.871, slope = 1.070)
+  geom_abline(intercept = -3.871, slope = 1.070) +
+  geom_vline(xintercept = 26.75, linetype = 'solid') +
+  geom_vline(xintercept = c(25.8,27.55), linetype = 'dashed') +
+  geom_hline(yintercept = 26.3, linetype = 'solid') +
+  geom_hline(yintercept = c(25.9,26.8), linetype = 'dashed') +
+  scale_color_viridis()
 
 # Plotting N vs S, W vs E
 plot_data <- data.frame(Region1 = tData_regions[[1]]$LogTotal + scale_output,
