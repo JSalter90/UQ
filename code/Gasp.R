@@ -2,7 +2,12 @@ source('code/rotation_functions.R')
 source('code/FastHM.R')
 
 # From ExeterUQ https://github.com/BayesExeter/ExeterUQ - edit path to read this
-source('~/ExeterUQ/BuildEmulator/BuildEmulator.R')
+twd <- getwd()
+setwd('~/Dropbox/ExeterUQ')
+source('BuildEmulator/BuildEmulator.R')
+setwd(twd)
+
+library(RobustGaSP)
 
 #' Building a single GaSP emulator for basis output
 #' 
