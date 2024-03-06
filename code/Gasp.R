@@ -308,6 +308,7 @@ InitialBasisEmulators <- BasisEmulators
 #' 
 #' @export
 BasisPredGasp <- function(Design, emulators){
+  require(parallel)
   EmOutput <- mclapply(1:length(emulators), function(e) PredictGasp(Design,emulators[[e]]))
   Expectation <- Variance <- matrix(0, nrow = dim(Design)[1], ncol = length(emulators))
   for (j in 1:length(emulators)){
