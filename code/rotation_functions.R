@@ -265,7 +265,7 @@ ReconObs <- function(obs, basis, ...){
 #' Coefficients_weighted <- CalcScores(data = DataBasis$CentredField, basis = DataBasis$tBasis[,1:3], weightinv = W_inv)
 #'
 #' @export
-CalcScores <- function(data, basis, weightinv = NULL){
+Project <- function(data, basis, weightinv = NULL){
   d <- dim(data)[2]
   if (is.null(d)){
     d <- 1
@@ -306,6 +306,8 @@ CalcScores <- function(data, basis, weightinv = NULL){
   }
   return(t(scores))
 }
+
+CalcScores <- Project
 
 #### Rename ####
 #' Number of basis vectors required to explain proportion of data
