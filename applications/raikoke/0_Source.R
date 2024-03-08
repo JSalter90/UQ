@@ -24,7 +24,7 @@ source('BuildEmulator/BuildEmulator.R')
 setwd(uqdir)
 
 # Load design matrix
-design <- readRDS('papers/raikoke/data/design.rds')
+design <- readRDS('applications/raikoke/data/design.rds')
 
 # Defining parameter ranges
 minMER <- 50.7 * 10^7 * (9 - 0.551)^(1/0.241) * 0.33 * 0.5/100
@@ -51,7 +51,7 @@ ScaledDesign$MER <- NULL # for consistency; never use this variable in emulation
 #                   Var = c())
 
 # Just load this in
-#obs <- readRDS('papers/raikoke/data/obs.rds')
+#obs <- readRDS('applications/raikoke/data/obs.rds')
 
 
 

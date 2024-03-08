@@ -1,5 +1,5 @@
 # Load required packages, functions
-source("papers/raikoke/0_Source.R")
+source("applications/raikoke/0_Source.R")
 
 # Define design for evaluating emulators with
 N <- 10^5
@@ -32,33 +32,33 @@ scale_output <- log(0.95)
 # Load in emulators
 # For the totals at T3, T5 and T7 these are available in data folder
 # For others, need to fit and store locally
-EmT3 <- load_ExUQmogp('papers/raikoke/data/EmT3/train')
-EmT5 <- load_ExUQmogp('papers/raikoke/data/EmT5/train')
-EmT7 <- load_ExUQmogp('papers/raikoke/data/EmT7/train')
+EmT3 <- load_ExUQmogp('applications/raikoke/data/EmT3/train')
+EmT5 <- load_ExUQmogp('applications/raikoke/data/EmT5/train')
+EmT7 <- load_ExUQmogp('applications/raikoke/data/EmT7/train')
 
-EmT3_MET <- LoadMulti('papers/raikoke/data/EmT3_MET', 'train')
-EmT5_MET <- LoadMulti('papers/raikoke/data/EmT5_MET', 'train')
-EmT7_MET <- LoadMulti('papers/raikoke/data/EmT7_MET', 'train')
+EmT3_MET <- LoadMulti('applications/raikoke/data/EmT3_MET', 'train')
+EmT5_MET <- LoadMulti('applications/raikoke/data/EmT5_MET', 'train')
+EmT7_MET <- LoadMulti('applications/raikoke/data/EmT7_MET', 'train')
 
 # Regions, overall
-EmRegion1 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region1')
-EmRegion2 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region2')
-EmRegion3 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region3')
-EmRegion4 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region4')
-EmRegion5 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region5')
-EmRegion6 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region6')
-EmRegion7 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region7')
-EmRegion8 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region8')
+EmRegion1 <- load_ExUQmogp('applications/raikoke/data/EmRegion/region1')
+EmRegion2 <- load_ExUQmogp('applications/raikoke/data/EmRegion/region2')
+EmRegion3 <- load_ExUQmogp('applications/raikoke/data/EmRegion/region3')
+EmRegion4 <- load_ExUQmogp('applications/raikoke/data/EmRegion/region4')
+EmRegion5 <- load_ExUQmogp('applications/raikoke/data/EmRegion/region5')
+EmRegion6 <- load_ExUQmogp('applications/raikoke/data/EmRegion/region6')
+EmRegion7 <- load_ExUQmogp('applications/raikoke/data/EmRegion/region7')
+EmRegion8 <- load_ExUQmogp('applications/raikoke/data/EmRegion/region8')
 
 # By MET
-EmRegion1_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region1', 'region1')
-EmRegion2_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region2', 'region2')
-EmRegion3_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region3', 'region3')
-EmRegion4_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region4', 'region4')
-EmRegion5_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region5', 'region5')
-EmRegion6_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region6', 'region6')
-EmRegion7_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region7', 'region7')
-EmRegion8_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region8', 'region8')
+EmRegion1_MET <- LoadMulti('applications/raikoke/data/EmRegion_MET/region1', 'region1')
+EmRegion2_MET <- LoadMulti('applications/raikoke/data/EmRegion_MET/region2', 'region2')
+EmRegion3_MET <- LoadMulti('applications/raikoke/data/EmRegion_MET/region3', 'region3')
+EmRegion4_MET <- LoadMulti('applications/raikoke/data/EmRegion_MET/region4', 'region4')
+EmRegion5_MET <- LoadMulti('applications/raikoke/data/EmRegion_MET/region5', 'region5')
+EmRegion6_MET <- LoadMulti('applications/raikoke/data/EmRegion_MET/region6', 'region6')
+EmRegion7_MET <- LoadMulti('applications/raikoke/data/EmRegion_MET/region7', 'region7')
+EmRegion8_MET <- LoadMulti('applications/raikoke/data/EmRegion_MET/region8', 'region8')
 
 # Predict at T3/T5/T7 using a) overall emulator and b) each of the 18 MET emulators
 # Each of these objects is relatively large (mean, variance at N points for 19 emulators), hence not stored in Github

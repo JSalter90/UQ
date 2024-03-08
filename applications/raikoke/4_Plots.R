@@ -1,13 +1,13 @@
 # Load required packages, functions
-source("papers/raikoke/0_Source.R")
+source("applications/raikoke/0_Source.R")
 
 # Create some plots
 # For validation plots, see 1_Emulation.R
 
-tDataT3 <- readRDS("papers/raikoke/data/tDataT3.rds")
-tDataT5 <- readRDS("papers/raikoke/data/tDataT5.rds")
-tDataT7 <- readRDS("papers/raikoke/data/tDataT7.rds")
-tData_regions <- readRDS("papers/raikoke/data/tData_regions.rds")
+tDataT3 <- readRDS("applications/raikoke/data/tDataT3.rds")
+tDataT5 <- readRDS("applications/raikoke/data/tDataT5.rds")
+tDataT7 <- readRDS("applications/raikoke/data/tDataT7.rds")
+tData_regions <- readRDS("applications/raikoke/data/tData_regions.rds")
 
 # Find 95% intervals
 obs$Lower <- obs$Mean - 1.96*sqrt(obs$Var)

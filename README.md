@@ -10,7 +10,7 @@ Code for different emulation/calibration work
   
   * `code/discrepancy.R` (coming soon) will contain code for reframing history matching/calibration as a classification problem, with several worked toy examples
 
-* `papers/` contains specific applications (usually related to a paper)
+* `applications/` contains specific applications (often related to a paper)
 
 See also:
 
