@@ -1,0 +1,148 @@
+# Experiment using each of the left-out runs as the 'truth' in turn
+# and seeing how well we can identify this
+
+# Load required packages, functions
+source("papers/raikoke/0_Source.R")
+
+# Define observations using each of the 250 left out runs
+# Calculate implausibility using different % error
+# Assess how often the different metrics rule out the truth
+# This might not be helpful if NROY = 100%
+# So also calculate across other locations, and find ranking of this point - does it minimise impl?
+val_inds <- readRDS("papers/raikoke/data/val_inds.rds")
+tDataT3 <- readRDS("papers/raikoke/data/tDataT3.rds")
+
+# Load in emulator predictions across the 1000 ensemble members (only need the 250 val points)
+EnsPredT3 <- readRDS("papers/raikoke/data/EnsPredT3.rds")
+
+Exp_T3_var1 <- PseudoExperiment(tDataT3, val_inds, EnsPredT3, obs_error = 1 * subset(obs, Type == 'T3')$Var)
+Exp_T3_var01 <- PseudoExperiment(tDataT3, val_inds, EnsPredT3, obs_error = 0.1 * subset(obs, Type == 'T3')$Var)
+Exp_T3_var001 <- PseudoExperiment(tDataT3, val_inds, EnsPredT3, obs_error = 0.01 * subset(obs, Type == 'T3')$Var)
+
+# How often rule out the truth using overall emulator:
+sum(Exp_T3_var1$overall_impl > 3)
+
+# How often rule out the truth using conservative definition:
+sum(Exp_T3_var1$total_matches == 0)
+
+# How often rule out the truth using random choice of MET:
+sum(Exp_T3_var1$total_matches < 9)
+
+# Sizes of the different spaces, across the 250 experiments:
+summary(Exp_T3_var1$overall_size)
+summary(Exp_T3_var1$pseudo_size)
+summary(Exp_T3_var1$cons_size)
+
+# Or combine
+data.frame(Type = c('Pseudo', 'Overall', 'Cons'),
+           Errors = c(sum(Exp_T3_var1$total_matches < 9),
+                      sum(Exp_T3_var1$overall_impl > 3), 
+                      sum(Exp_T3_var1$total_matches == 0)))
+
+#### Repeat for other time points, combinations of regions ####
+# T5
+tDataT5 <- readRDS("papers/raikoke/data/tDataT5.rds")
+EnsPredT5 <- readRDS("papers/raikoke/data/EnsPredT5.rds")
+Exp_T5_var1 <- PseudoExperiment(tDataT5, val_inds, EnsPredT5, obs_error = 1 * subset(obs, Type == 'T5')$Var)
+Exp_T5_var01 <- PseudoExperiment(tDataT5, val_inds, EnsPredT5, obs_error = 0.1 * subset(obs, Type == 'T5')$Var)
+Exp_T5_var001 <- PseudoExperiment(tDataT5, val_inds, EnsPredT5, obs_error = 0.01 * subset(obs, Type == 'T5')$Var)
+
+# T7
+tDataT7 <- readRDS("papers/raikoke/data/tDataT7.rds")
+EnsPredT7 <- readRDS("papers/raikoke/data/EnsPredT7.rds")
+Exp_T7_var1 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 1 * subset(obs, Type == 'T7')$Var)
+Exp_T7_var01 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 0.1 * subset(obs, Type == 'T7')$Var)
+Exp_T7_var001 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 0.01 * subset(obs, Type == 'T7')$Var)
+
+# Regions
+tData_regions <- readRDS("papers/raikoke/data/tData_regions.rds")
+# Need to load in emulators, create predictions across the ensemble
+# Overall
+EmRegion1 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region1')
+EmRegion2 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region2')
+EmRegion3 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region3')
+EmRegion4 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region4')
+EmRegion5 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region5')
+EmRegion6 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region6')
+EmRegion7 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region7')
+EmRegion8 <- load_ExUQmogp('papers/raikoke/data/EmRegion/region8')
+
+# By MET
+EmRegion1_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region1', 'region1')
+EmRegion2_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region2', 'region2')
+EmRegion3_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region3', 'region3')
+EmRegion4_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region4', 'region4')
+EmRegion5_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region5', 'region5')
+EmRegion6_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region6', 'region6')
+EmRegion7_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region7', 'region7')
+EmRegion8_MET <- LoadMulti('papers/raikoke/data/EmRegion_MET/region8', 'region8')
+
+# Predictions
+EnsPredRegion1 <- PredictBoth(EmRegion1, EmRegion1_MET, ScaledDesign)
+EnsPredRegion2 <- PredictBoth(EmRegion2, EmRegion2_MET, ScaledDesign)
+EnsPredRegion3 <- PredictBoth(EmRegion3, EmRegion3_MET, ScaledDesign)
+EnsPredRegion4 <- PredictBoth(EmRegion4, EmRegion4_MET, ScaledDesign)
+EnsPredRegion5 <- PredictBoth(EmRegion5, EmRegion5_MET, ScaledDesign)
+EnsPredRegion6 <- PredictBoth(EmRegion6, EmRegion6_MET, ScaledDesign)
+EnsPredRegion7 <- PredictBoth(EmRegion7, EmRegion7_MET, ScaledDesign)
+EnsPredRegion8 <- PredictBoth(EmRegion8, EmRegion8_MET, ScaledDesign)
+
+# N+S (R1+R2)
+Exp_NS_var1 <- PseudoExperiment(list(tData_regions[[1]], tData_regions[[2]]),
+                                list(val_inds, val_inds),
+                                list(EnsPredRegion1, EnsPredRegion2),
+                                obs_error = c(subset(obs, Type == 'R1')$Var, subset(obs, Type == 'R2')$Var))
+Exp_NS_var01 <- PseudoExperiment(list(tData_regions[[1]], tData_regions[[2]]),
+                                list(val_inds, val_inds),
+                                list(EnsPredRegion1, EnsPredRegion2),
+                                obs_error = 0.1*c(subset(obs, Type == 'R1')$Var, subset(obs, Type == 'R2')$Var))
+Exp_NS_var001 <- PseudoExperiment(list(tData_regions[[1]], tData_regions[[2]]),
+                                list(val_inds, val_inds),
+                                list(EnsPredRegion1, EnsPredRegion2),
+                                obs_error = 0.01*c(subset(obs, Type == 'R1')$Var, subset(obs, Type == 'R2')$Var))
+
+# W+E (R3+R4)
+Exp_WE_var1 <- PseudoExperiment(list(tData_regions[[3]], tData_regions[[4]]),
+                                list(val_inds, val_inds),
+                                list(EnsPredRegion3, EnsPredRegion4),
+                                obs_error = c(subset(obs, Type == 'R3')$Var, subset(obs, Type == 'R4')$Var))
+Exp_WE_var01 <- PseudoExperiment(list(tData_regions[[3]], tData_regions[[4]]),
+                                 list(val_inds, val_inds),
+                                 list(EnsPredRegion3, EnsPredRegion4),
+                                 obs_error = 0.1*c(subset(obs, Type == 'R3')$Var, subset(obs, Type == 'R4')$Var))
+Exp_WE_var001 <- PseudoExperiment(list(tData_regions[[3]], tData_regions[[4]]),
+                                  list(val_inds, val_inds),
+                                  list(EnsPredRegion3, EnsPredRegion4),
+                                  obs_error = 0.01*c(subset(obs, Type == 'R3')$Var, subset(obs, Type == 'R4')$Var))
+
+# 4 regions (R5+R6+R7+R8)
+Exp_4R_var1 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
+                                list(val_inds, val_inds, val_inds, val_inds),
+                                list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
+                                obs_error = c(subset(obs, Type == 'R5')$Var, subset(obs, Type == 'R6')$Var, subset(obs, Type == 'R7')$Var, subset(obs, Type == 'R8')$Var))
+Exp_4R_var01 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
+                                 list(val_inds, val_inds, val_inds, val_inds),
+                                 list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
+                                 obs_error = 0.1*c(subset(obs, Type == 'R5')$Var, subset(obs, Type == 'R6')$Var, subset(obs, Type == 'R7')$Var, subset(obs, Type == 'R8')$Var))
+Exp_4R_var001 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
+                                  list(val_inds, val_inds, val_inds, val_inds),
+                                  list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
+                                  obs_error = 0.01*c(subset(obs, Type == 'R5')$Var, subset(obs, Type == 'R6')$Var, subset(obs, Type == 'R7')$Var, subset(obs, Type == 'R8')$Var))
+
+# 3/4 regions, i.e. use 2nd max impl across the 4 regions (i.e. 1 allowed to 'fail')
+Exp_4Rk2_var1 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
+                                list(val_inds, val_inds, val_inds, val_inds),
+                                list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
+                                obs_error = c(subset(obs, Type == 'R5')$Var, subset(obs, Type == 'R6')$Var, subset(obs, Type == 'R7')$Var, subset(obs, Type == 'R8')$Var),
+                                kmax = 2)
+Exp_4Rk2_var01 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
+                                 list(val_inds, val_inds, val_inds, val_inds),
+                                 list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
+                                 obs_error = 0.1*c(subset(obs, Type == 'R5')$Var, subset(obs, Type == 'R6')$Var, subset(obs, Type == 'R7')$Var, subset(obs, Type == 'R8')$Var),
+                                 kmax = 2)
+Exp_4Rk2_var001 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
+                                  list(val_inds, val_inds, val_inds, val_inds),
+                                  list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
+                                  obs_error = 0.01*c(subset(obs, Type == 'R5')$Var, subset(obs, Type == 'R6')$Var, subset(obs, Type == 'R7')$Var, subset(obs, Type == 'R8')$Var),
+                                  kmax = 2)
+
