@@ -46,14 +46,8 @@ ScaledDesign$MER <- NULL # for consistency; never use this variable in emulation
 # Observation information
 # For history matching, require estimated obs (mean/median), observation error variance
 # $Mean gives mean (on log scale), $Var gives estimated variance (on log scale)
-# obs <- data.frame(Type = c('T3', 'T5', 'T7', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8'),
-#                   Mean = c(),
-#                   Var = c())
-
 # Just load this in
-#obs <- readRDS('applications/raikoke/data/obs.rds')
-
-
+obs <- readRDS('applications/raikoke/data/obs.rds')
 
 #### Additional functions for this work specifically ####
 # Plot NAME output
