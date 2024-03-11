@@ -34,10 +34,9 @@ summary(Exp_T3_var1$pseudo_size)
 summary(Exp_T3_var1$cons_size)
 
 # Or combine
-data.frame(Type = c('Pseudo', 'Overall', 'Cons'),
-           Errors = c(sum(Exp_T3_var1$total_matches < 9),
-                      sum(Exp_T3_var1$overall_impl > 3), 
-                      sum(Exp_T3_var1$total_matches == 0)))
+SummariseExperiment(Exp_T3_var1)
+SummariseExperiment(Exp_T3_var01)
+SummariseExperiment(Exp_T3_var001)
 
 #### Repeat for other time points, combinations of regions ####
 # T5
@@ -48,6 +47,10 @@ Exp_T5_var1 <- PseudoExperiment(tDataT5, val_inds, EnsPredT5, obs_error = 1 * Ob
 Exp_T5_var01 <- PseudoExperiment(tDataT5, val_inds, EnsPredT5, obs_error = 0.1 * ObsVar)
 Exp_T5_var001 <- PseudoExperiment(tDataT5, val_inds, EnsPredT5, obs_error = 0.01 * ObsVar)
 
+SummariseExperiment(Exp_T5_var1)
+SummariseExperiment(Exp_T5_var01)
+SummariseExperiment(Exp_T5_var001)
+
 # T7
 tDataT7 <- readRDS("applications/raikoke/data/tDataT7.rds")
 EnsPredT7 <- readRDS("applications/raikoke/data/EnsPredT7.rds")
@@ -55,6 +58,10 @@ ObsVar <- subset(obs, Type == 'T7')$Var
 Exp_T7_var1 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 1 * ObsVar)
 Exp_T7_var01 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 0.1 * ObsVar)
 Exp_T7_var001 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 0.01 * ObsVar)
+
+SummariseExperiment(Exp_T7_var1)
+SummariseExperiment(Exp_T7_var01)
+SummariseExperiment(Exp_T7_var001)
 
 # Regions
 tData_regions <- readRDS("applications/raikoke/data/tData_regions.rds")

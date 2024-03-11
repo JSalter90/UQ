@@ -233,6 +233,15 @@ PseudoExperiment <- function(tData, val_inds, em_pred, obs_error, kmax = 1, boun
               cons_size = cons_size))
 }
 
+SummariseExperiment <- function(PseudoExperiment){
+  data.frame(Type = c('Pseudo', 'Overall', 'Cons'),
+             Errors = c(sum(PseudoExperiment$total_matches < 9),
+                        sum(PseudoExperiment$overall_impl > 3), 
+                        sum(PseudoExperiment$total_matches == 0)),
+             Size = c(median(PseudoExperiment$pseudo_size), 
+                      median(PseudoExperiment$overall_size),
+                      median(PseudoExperiment$cons_size)))
+}
 
 kth_max <- function(x,k) {
   sorted_values <- sort(x, decreasing = TRUE)
