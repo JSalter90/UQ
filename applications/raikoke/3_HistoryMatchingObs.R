@@ -100,22 +100,22 @@ for (j in 1:18){
 }
 
 # Finding size of NROY under different assumptions, for different time points, different emulators
-NROY_T3 <- data.frame(Overall = implT3 < bound, # just considering the overall emulator
-                      Strict = apply(implT3_MET < bound, 1, sum) == 18, # all 18 METs must pass
-                      Conservative = apply(implT3_MET < bound, 1, sum) > 0, # any single MET can be not implausible
-                      Pseudo = apply(implT3_MET < bound, 1, sum) >= 9) # at least half of METs are not implausible
+NROY_T3 <- data.frame(Overall = sum(implT3 < bound), # just considering the overall emulator
+                      Strict = sum(apply(implT3_MET < bound, 1, sum) == 18), # all 18 METs must pass
+                      Conservative = sum(apply(implT3_MET < bound, 1, sum) > 0), # any single MET can be not implausible
+                      Pseudo = sum(apply(implT3_MET < bound, 1, sum) >= 9)) # at least half of METs are not implausible
 
 # Same, but for T3 and T5
-NROY_T5 <- data.frame(Overall = implT3 < bound & implT5 < bound,
-                      Strict = apply(implT3_MET < bound, 1, sum) == 18 & apply(implT5_MET < bound, 1, sum) == 18,
-                      Conservative = apply(implT3_MET < bound, 1, sum) > 0 & apply(implT5_MET < bound, 1, sum) > 0,
-                      Pseudo = apply(implT3_MET < bound, 1, sum) >= 9 & apply(implT5_MET < bound, 1, sum) >= 9)
+NROY_T5 <- data.frame(Overall = sum(implT3 < bound & implT5 < bound),
+                      Strict = sum(apply(implT3_MET < bound, 1, sum) == 18 & apply(implT5_MET < bound, 1, sum) == 18),
+                      Conservative = sum(apply(implT3_MET < bound, 1, sum) > 0 & apply(implT5_MET < bound, 1, sum) > 0),
+                      Pseudo = sum(apply(implT3_MET < bound, 1, sum) >= 9 & apply(implT5_MET < bound, 1, sum) >= 9))
 
 # Same, but for T3, T5 and T7
-NROY_T7 <- data.frame(Overall = implT3 < bound & implT5 < bound & implT7 < bound,
-                      Strict = apply(implT3_MET < bound, 1, sum) == 18 & apply(implT5_MET < bound, 1, sum) == 18 & apply(implT7_MET < bound, 1, sum) == 18,
-                      Conservative = apply(implT3_MET < bound, 1, sum) > 0 & apply(implT5_MET < bound, 1, sum) > 0 & apply(implT7_MET < bound, 1, sum) > 0,
-                      Pseudo = apply(implT3_MET < bound, 1, sum) >= 9 & apply(implT5_MET < bound, 1, sum) >= 9 & apply(implT7_MET < bound, 1, sum) >= 9)
+NROY_T7 <- data.frame(Overall = sum(implT3 < bound & implT5 < bound & implT7 < bound),
+                      Strict = sum(apply(implT3_MET < bound, 1, sum) == 18 & apply(implT5_MET < bound, 1, sum) == 18 & apply(implT7_MET < bound, 1, sum) == 18),
+                      Conservative = sum(apply(implT3_MET < bound, 1, sum) > 0 & apply(implT5_MET < bound, 1, sum) > 0 & apply(implT7_MET < bound, 1, sum) > 0),
+                      Pseudo = sum(apply(implT3_MET < bound, 1, sum) >= 9 & apply(implT5_MET < bound, 1, sum) >= 9 & apply(implT7_MET < bound, 1, sum) >= 9))
 
 # N+S (R1, R2)
 implR1 <- abs(scale_output + PredR1$overall$Mean - subset(obs, Type == 'N')$Mean) / sqrt(PredR1$overall$SD^2 + subset(obs, Type == 'N')$Var)
@@ -131,10 +131,10 @@ for (j in 1:18){
   implR2_MET[,j] <- abs(scale_output + PredR2$met[[j]]$Mean - subset(obs, Type == 'S')$Mean) / sqrt(PredR2$met[[j]]$SD^2 + subset(obs, Type == 'S')$Var)
 }
 
-NROY_NS <- data.frame(Overall = implR1 < bound & implR2 < bound,
-                      Strict = apply(implR1_MET < bound & implR2_MET < bound, 1, sum) == 18,
-                      Conservative = apply(implR1_MET < bound & implR2_MET < bound, 1, sum) > 0,
-                      Pseudo = apply(implR1_MET < bound & implR2_MET < bound, 1, sum) >= 9)
+NROY_NS <- data.frame(Overall = sum(implR1 < bound & implR2 < bound),
+                      Strict = sum(apply(implR1_MET < bound & implR2_MET < bound, 1, sum) == 18),
+                      Conservative = sum(apply(implR1_MET < bound & implR2_MET < bound, 1, sum) > 0),
+                      Pseudo = sum(apply(implR1_MET < bound & implR2_MET < bound, 1, sum) >= 9))
 
 # W+E (R3, R4)
 implR3 <- abs(scale_output + PredR3$overall$Mean - subset(obs, Type == 'W')$Mean) / sqrt(PredR3$overall$SD^2 + subset(obs, Type == 'W')$Var)
@@ -150,10 +150,10 @@ for (j in 1:18){
   implR4_MET[,j] <- abs(scale_output + PredR4$met[[j]]$Mean - subset(obs, Type == 'E')$Mean) / sqrt(PredR4$met[[j]]$SD^2 + subset(obs, Type == 'E')$Var)
 }
 
-NROY_NS <- data.frame(Overall = implR3 < bound & implR4 < bound,
-                      Strict = apply(implR3_MET < bound & implR4_MET < bound, 1, sum) == 18,
-                      Conservative = apply(implR3_MET < bound & implR4_MET < bound, 1, sum) > 0,
-                      Pseudo = apply(implR3_MET < bound & implR4_MET < bound, 1, sum) >= 9)
+NROY_NS <- data.frame(Overall = sum(implR3 < bound & implR4 < bound),
+                      Strict = sum(apply(implR3_MET < bound & implR4_MET < bound, 1, sum) == 18),
+                      Conservative = sum(apply(implR3_MET < bound & implR4_MET < bound, 1, sum) > 0),
+                      Pseudo = sum(apply(implR3_MET < bound & implR4_MET < bound, 1, sum) >= 9))
 
 # 4 regions
 implR5 <- abs(scale_output + PredR5$overall$Mean - subset(obs, Type == 'NW')$Mean) / sqrt(PredR5$overall$SD^2 + subset(obs, Type == 'NW')$Var)
@@ -181,17 +181,17 @@ for (j in 1:18){
   implR8_MET[,j] <- abs(scale_output + PredR8$met[[j]]$Mean - subset(obs, Type == 'SW')$Mean) / sqrt(PredR8$met[[j]]$SD^2 + subset(obs, Type == 'SW')$Var)
 }
 
-NROY_4R <- data.frame(Overall = implR5 < bound & implR6 < bound & implR7 < bound & implR8 < bound,
-                      Strict = apply(implR5_MET < bound & implR6_MET < bound & implR7_MET < bound & implR8_MET < bound, 1, sum) == 18,
-                      Conservative = apply(implR5_MET < bound & implR6_MET < bound & implR7_MET < bound & implR8_MET < bound, 1, sum) > 0,
-                      Pseudo = apply(implR5_MET < bound & implR6_MET < bound & implR7_MET < bound & implR8_MET < bound, 1, sum) >= 9)
+NROY_4R <- data.frame(Overall = sum(implR5 < bound & implR6 < bound & implR7 < bound & implR8 < bound),
+                      Strict = sum(apply(implR5_MET < bound & implR6_MET < bound & implR7_MET < bound & implR8_MET < bound, 1, sum) == 18),
+                      Conservative = sum(apply(implR5_MET < bound & implR6_MET < bound & implR7_MET < bound & implR8_MET < bound, 1, sum) > 0),
+                      Pseudo = sum(apply(implR5_MET < bound & implR6_MET < bound & implR7_MET < bound & implR8_MET < bound, 1, sum) >= 9))
 
 # Instead find 2nd max
 impl4R_k2 <- apply(cbind(implR5, implR6, implR7, implR8), 1, kth_max, k = 2)
 impl4R_k2_MET <- apply(abind(implR5, implR6, implR7, implR8), c(1,2), kth_max, k = 2)
 
-NROY_4R_k2 <- data.frame(Overall = impl4R_k2 < bound,
-                         Strict = apply(impl4R_k2_MET < bound, 1, sum) == 18,
-                         Conservative = apply(impl4R_k2_MET < bound, 1, sum) > 0,
-                         Pseudo = apply(impl4R_k2_MET < bound, 1, sum) >= 9)
+NROY_4R_k2 <- data.frame(Overall = sum(impl4R_k2 < bound),
+                         Strict = sum(apply(impl4R_k2_MET < bound, 1, sum) == 18),
+                         Conservative = sum(apply(impl4R_k2_MET < bound, 1, sum) > 0),
+                         Pseudo = sum(apply(impl4R_k2_MET < bound, 1, sum) >= 9))
 
