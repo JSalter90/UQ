@@ -10,35 +10,47 @@ source("applications/raikoke/0_Source.R")
 # This might not be helpful if NROY = 100%
 # So also calculate across other locations, and find ranking of this point - does it minimise impl?
 val_inds <- readRDS("applications/raikoke/data/val_inds.rds")
-tDataT3 <- readRDS("applications/raikoke/data/tDataT3.rds")
+tDataT1 <- readRDS("applications/raikoke/data/tDataT1.rds")
 
 # Load in emulator predictions across the 1000 ensemble members (only need the 250 val points)
+EnsPredT1 <- readRDS("applications/raikoke/data/EnsPredT1.rds")
+ObsVar <- subset(obs, Type == 'T1')$Var
+Exp_T1_var1 <- PseudoExperiment(tDataT1, val_inds, EnsPredT1, obs_error = 1 * ObsVar)
+Exp_T1_var01 <- PseudoExperiment(tDataT1, val_inds, EnsPredT1, obs_error = 0.1 * ObsVar)
+Exp_T1_var001 <- PseudoExperiment(tDataT1, val_inds, EnsPredT1, obs_error = 0.01 * ObsVar)
+
+# How often rule out the truth using overall emulator:
+sum(Exp_T1_var1$overall_impl > 3)
+
+# How often rule out the truth using conservative definition:
+sum(Exp_T1_var1$total_matches == 0)
+
+# How often rule out the truth using random choice of MET:
+sum(Exp_T1_var1$total_matches < 9)
+
+# Sizes of the different spaces, across the 250 experiments:
+summary(Exp_T1_var1$overall_size)
+summary(Exp_T1_var1$pseudo_size)
+summary(Exp_T1_var1$cons_size)
+
+# Or combine
+SummariseExperiment(Exp_T1_var1)
+SummariseExperiment(Exp_T1_var01)
+SummariseExperiment(Exp_T1_var001)
+
+#### Repeat for other time points, combinations of regions ####
+# T3
+tDataT3 <- readRDS("applications/raikoke/data/tDataT3.rds")
 EnsPredT3 <- readRDS("applications/raikoke/data/EnsPredT3.rds")
 ObsVar <- subset(obs, Type == 'T3')$Var
 Exp_T3_var1 <- PseudoExperiment(tDataT3, val_inds, EnsPredT3, obs_error = 1 * ObsVar)
 Exp_T3_var01 <- PseudoExperiment(tDataT3, val_inds, EnsPredT3, obs_error = 0.1 * ObsVar)
 Exp_T3_var001 <- PseudoExperiment(tDataT3, val_inds, EnsPredT3, obs_error = 0.01 * ObsVar)
 
-# How often rule out the truth using overall emulator:
-sum(Exp_T3_var1$overall_impl > 3)
-
-# How often rule out the truth using conservative definition:
-sum(Exp_T3_var1$total_matches == 0)
-
-# How often rule out the truth using random choice of MET:
-sum(Exp_T3_var1$total_matches < 9)
-
-# Sizes of the different spaces, across the 250 experiments:
-summary(Exp_T3_var1$overall_size)
-summary(Exp_T3_var1$pseudo_size)
-summary(Exp_T3_var1$cons_size)
-
-# Or combine
 SummariseExperiment(Exp_T3_var1)
 SummariseExperiment(Exp_T3_var01)
 SummariseExperiment(Exp_T3_var001)
 
-#### Repeat for other time points, combinations of regions ####
 # T5
 tDataT5 <- readRDS("applications/raikoke/data/tDataT5.rds")
 EnsPredT5 <- readRDS("applications/raikoke/data/EnsPredT5.rds")
@@ -50,18 +62,6 @@ Exp_T5_var001 <- PseudoExperiment(tDataT5, val_inds, EnsPredT5, obs_error = 0.01
 SummariseExperiment(Exp_T5_var1)
 SummariseExperiment(Exp_T5_var01)
 SummariseExperiment(Exp_T5_var001)
-
-# T7
-tDataT7 <- readRDS("applications/raikoke/data/tDataT7.rds")
-EnsPredT7 <- readRDS("applications/raikoke/data/EnsPredT7.rds")
-ObsVar <- subset(obs, Type == 'T7')$Var
-Exp_T7_var1 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 1 * ObsVar)
-Exp_T7_var01 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 0.1 * ObsVar)
-Exp_T7_var001 <- PseudoExperiment(tDataT7, val_inds, EnsPredT7, obs_error = 0.01 * ObsVar)
-
-SummariseExperiment(Exp_T7_var1)
-SummariseExperiment(Exp_T7_var01)
-SummariseExperiment(Exp_T7_var001)
 
 # Regions
 tData_regions <- readRDS("applications/raikoke/data/tData_regions.rds")

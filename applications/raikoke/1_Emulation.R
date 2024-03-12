@@ -10,9 +10,9 @@ val_inds <- readRDS("applications/raikoke/data/val_inds.rds")
 # - each input has been scaled to [-1,1]
 # - noise is a uniformly, randomly sampled term on [-1,1] to protect against overfitting mean functions
 # - LogTotal is the log of the total ash for the given timepoint/region
+tDataT1 <- readRDS("applications/raikoke/data/tDataT1.rds")
 tDataT3 <- readRDS("applications/raikoke/data/tDataT3.rds")
 tDataT5 <- readRDS("applications/raikoke/data/tDataT5.rds")
-tDataT7 <- readRDS("applications/raikoke/data/tDataT7.rds")
 
 # Also for each region
 # R1 = N, R2 = S, R3 = W, R4 = E, R5 = NW, R6 = NE, R7 = SE, R8 = SW
@@ -21,7 +21,7 @@ tDataT7 <- readRDS("applications/raikoke/data/tDataT7.rds")
 tData_regions <- readRDS("applications/raikoke/data/tData_regions.rds")
 
 #### Fitting emulators ####
-# Emulators for totals at T3, T5 and T7 are available in data folder
+# Emulators for totals at T1, T3 and T5 are available in data folder
 # Here uses MOGP, but other choices (e.g. RobustGasp) should do fine
 # Key assumption we make is that first fit a (possibly complex) mean function to explain variability
 # This process also selects active/inactive variables prior to fitting covariance
@@ -31,17 +31,36 @@ tData_regions <- readRDS("applications/raikoke/data/tData_regions.rds")
 # In this work, fitting process was not automatic
 # Edited things like NuggetProportion (nugget prior), lm.maxdf (number of terms allowed in mean function) in order to get emulator(s) that validate well
 # Final choices of these are shown
-# For T3, T5, T7, these are not run here as the emulators exist on Github, and are loaded in later
+# For T1, T3, T5, these are not run here as the emulators exist on Github, and are loaded in later
+PriorT1 <- choices.default
+PriorT1$NuggetProportion <- 0.1
+# dir.create('applications/raikoke/data/EmT1') # if this emulator hasn't been created before, create a directory to store it in
+# EmT1 <- BuildNewEmulators(tData = tDataT1, HowManyEmulators = 1, meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT1))
+# save_ExUQmogp(EmT1, file = 'applications/raikoke/data/EmT1/train')
+
+# For each MET
+PriorT1_MET <- choices.default
+PriorT1_MET$NuggetProportion <- 0.75
+PriorT1_MET$lm.maxdf <- 3 # we have only ~35 training points for each, so this choice should be low, but also whether we overfit/underfit will be quite sensitive to this
+# dir.create('applications/raikoke/data/EmT1_MET')
+# EmT1_MET <- NULL
+# for (m in 0:17){
+#   EmT1_MET[[m+1]] <- BuildNewEmulators(tData = tDataT1[train_inds[which(design$MET[train_inds] == m)],], HowManyEmulators = 1,
+#                                        meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT1_MET))
+# }
+# SaveMulti(EmT1_MET, file = 'applications/raikoke/data/EmT1_MET/train')
+
+# T3
 PriorT3 <- choices.default
 PriorT3$NuggetProportion <- 0.1
-# dir.create('applications/raikoke/data/EmT3') # if this emulator hasn't been created before, create a directory to store it in
+# dir.create('applications/raikoke/data/EmT3')
 # EmT3 <- BuildNewEmulators(tData = tDataT3, HowManyEmulators = 1, meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT3))
 # save_ExUQmogp(EmT3, file = 'applications/raikoke/data/EmT3/train')
 
-# For each MET
+# By MET
 PriorT3_MET <- choices.default
 PriorT3_MET$NuggetProportion <- 0.75
-PriorT3_MET$lm.maxdf <- 3 # we have only ~35 training points for each, so this choice should be low, but also whether we overfit/underfit will be quite sensitive to this
+PriorT3_MET$lm.maxdf <- 3
 # dir.create('applications/raikoke/data/EmT3_MET')
 # EmT3_MET <- NULL
 # for (m in 0:17){
@@ -52,15 +71,15 @@ PriorT3_MET$lm.maxdf <- 3 # we have only ~35 training points for each, so this c
 
 # T5
 PriorT5 <- choices.default
-PriorT5$NuggetProportion <- 0.1
+PriorT5$NuggetProportion <- 0.05
 # dir.create('applications/raikoke/data/EmT5')
 # EmT5 <- BuildNewEmulators(tData = tDataT5, HowManyEmulators = 1, meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT5))
 # save_ExUQmogp(EmT5, file = 'applications/raikoke/data/EmT5/train')
 
 # By MET
 PriorT5_MET <- choices.default
-PriorT5_MET$NuggetProportion <- 0.75
-PriorT5_MET$lm.maxdf <- 3
+PriorT5_MET$NuggetProportion <- 0.5
+PriorT5_MET$lm.maxdf <- 4
 # dir.create('applications/raikoke/data/EmT5_MET')
 # EmT5_MET <- NULL
 # for (m in 0:17){
@@ -69,80 +88,61 @@ PriorT5_MET$lm.maxdf <- 3
 # }
 # SaveMulti(EmT5_MET, file = 'applications/raikoke/data/EmT5_MET/train')
 
-# T7
-PriorT7 <- choices.default
-PriorT7$NuggetProportion <- 0.05
-# dir.create('applications/raikoke/data/EmT7')
-# EmT7 <- BuildNewEmulators(tData = tDataT7, HowManyEmulators = 1, meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT7))
-# save_ExUQmogp(EmT7, file = 'applications/raikoke/data/EmT7/train')
-
-# By MET
-PriorT7_MET <- choices.default
-PriorT7_MET$NuggetProportion <- 0.5
-PriorT7_MET$lm.maxdf <- 4
-# dir.create('applications/raikoke/data/EmT7_MET')
-# EmT7_MET <- NULL
-# for (m in 0:17){
-#   EmT7_MET[[m+1]] <- BuildNewEmulators(tData = tDataT7[train_inds[which(design$MET[train_inds] == m)],], HowManyEmulators = 1,
-#                                        meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT7_MET))
-# }
-# SaveMulti(EmT7_MET, file = 'applications/raikoke/data/EmT7_MET/train')
-
 
 #### Loading emulators ####
 # Either generated by above code, or loading directly from file
+EmT1 <- load_ExUQmogp('applications/raikoke/data/EmT1/train')
 EmT3 <- load_ExUQmogp('applications/raikoke/data/EmT3/train')
 EmT5 <- load_ExUQmogp('applications/raikoke/data/EmT5/train')
-EmT7 <- load_ExUQmogp('applications/raikoke/data/EmT7/train')
 
+EmT1_MET <- LoadMulti('applications/raikoke/data/EmT1_MET', 'train')
 EmT3_MET <- LoadMulti('applications/raikoke/data/EmT3_MET', 'train')
 EmT5_MET <- LoadMulti('applications/raikoke/data/EmT5_MET', 'train')
-EmT7_MET <- LoadMulti('applications/raikoke/data/EmT7_MET', 'train')
 
 #### Validation ####
 # These are unlikely to be automatically suitable - likely need to revisit some emulator assumptions above
+ValT1 <- ValidateBoth(EmT1, EmT1_MET, tDataT1, design[,-4], train_inds, val_inds, train_inds, val_inds)
+ValT1$plot1
+
 ValT3 <- ValidateBoth(EmT3, EmT3_MET, tDataT3, design[,-4], train_inds, val_inds, train_inds, val_inds)
 ValT3$plot1
 
 ValT5 <- ValidateBoth(EmT5, EmT5_MET, tDataT5, design[,-4], train_inds, val_inds, train_inds, val_inds)
 ValT5$plot1
 
-ValT7 <- ValidateBoth(EmT7, EmT7_MET, tDataT7, design[,-4], train_inds, val_inds, train_inds, val_inds)
-ValT7$plot1
-
-# Can also use other functions with this type of emulator, e.g LOO for T7
-LOO.plot(Emulators = EmT7, which.emulator = 1,
-         ParamNames = colnames(tDataT7)[EmT7$fitting.elements$ActiveIndices[[1]]])
-# Out-of-sample predictions for T7
-ValidationMOGP(NewData = tDataT7[val_inds,], EmT7, tData = tDataT7[train_inds,], which.emulator = 1, 
-               ParamNames = colnames(tDataT7[train_inds,])[EmT7$fitting.elements$ActiveIndices[[1]]])
+# Can also use other functions with this type of emulator, e.g LOO for T5
+LOO.plot(Emulators = EmT5, which.emulator = 1,
+         ParamNames = colnames(tDataT5)[EmT5$fitting.elements$ActiveIndices[[1]]])
+# Out-of-sample predictions for T5
+ValidationMOGP(NewData = tDataT5[val_inds,], EmT5, tData = tDataT5[train_inds,], which.emulator = 1, 
+               ParamNames = colnames(tDataT5[train_inds,])[EmT5$fitting.elements$ActiveIndices[[1]]])
 
 # Above function plots, reports % in 95% prediction interval
 # Could also consider other metrics, e.g. compare RMSE between the 2 sets of emulators
+rmserr(ValT1$overall$Mean, ValT1$overall$Truth)$rmse
+rmserr(ValT1$met$Mean, ValT1$met$Truth)$rmse
+
 rmserr(ValT3$overall$Mean, ValT3$overall$Truth)$rmse
 rmserr(ValT3$met$Mean, ValT3$met$Truth)$rmse
 
 rmserr(ValT5$overall$Mean, ValT5$overall$Truth)$rmse
 rmserr(ValT5$met$Mean, ValT5$met$Truth)$rmse
 
-rmserr(ValT7$overall$Mean, ValT7$overall$Truth)$rmse
-rmserr(ValT7$met$Mean, ValT7$met$Truth)$rmse
-
 # Repeat for all regions
-# As all T3, just going to assume same priors as for T3 above
+# As all T1, just going to assume same priors as for T1 above
 
 # Fitting overall emulators for regions 1-8, ignoring 6 for now
 # These are reasonably slow (O(minutes), as there's 750 training points)
 dir.create('applications/raikoke/data/EmRegion')
 for (i in c(1:5,7:8)){
-  EmRegion <- BuildNewEmulators(tData = tData_regions[[i]][train_inds,], HowManyEmulators = 1, meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT3))
+  EmRegion <- BuildNewEmulators(tData = tData_regions[[i]][train_inds,], HowManyEmulators = 1, meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT1))
   save_ExUQmogp(EmRegion, file = paste0('applications/raikoke/data/EmRegion/region', i))
 }
 
 # For region 6, there's a single run with zero (hence log = -Inf), just remove this here
 tmp_inds <- train_inds
 tmp_inds <- tmp_inds[!(tmp_inds == which(tData_regions[[6]]$LogTotal == -Inf))] # should be run 74
-EmRegion <- BuildNewEmulators(tData = tData_regions[[6]][tmp_inds,], HowManyEmulators = 1, meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT3))
+EmRegion <- BuildNewEmulators(tData = tData_regions[[6]][tmp_inds,], HowManyEmulators = 1, meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT1))
 save_ExUQmogp(EmRegion, file = paste0('applications/raikoke/data/EmRegion/region', 6))
 
 # Fitting MET emulators
@@ -154,7 +154,7 @@ for (i in c(1:5,7:8)){
   EmRegion_MET <- NULL
   for (m in 0:17){
     EmRegion_MET[[m+1]] <- BuildNewEmulators(tData = tData_regions[[i]][train_inds[which(design$MET[train_ind] == m)],], HowManyEmulators = 1,
-                                              meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT3_MET))
+                                              meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT1_MET))
   }
   SaveMulti(EmRegion_MET, file = paste0('region', i))
 }
@@ -162,7 +162,7 @@ for (i in c(1:5,7:8)){
 EmRegion_MET <- NULL
 for (m in 0:17){
   EmRegion_MET[[m+1]] <- BuildNewEmulators(tData = tData_regions[[6]][tmp_inds[which(design$MET[tmp_inds] == m)],], HowManyEmulators = 1,
-                                           meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT3_MET))
+                                           meanFun="fitted", kernel = c('Matern52'), Choices = list(PriorT1_MET))
 }
 SaveMulti(EmRegion_MET, file = paste0('region', 6))
 setwd(twd)

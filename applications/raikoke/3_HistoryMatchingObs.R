@@ -30,15 +30,15 @@ for (i in 1:ncol(CalDesignScaled)){
 scale_output <- log(0.95)
 
 # Load in emulators
-# For the totals at T3, T5 and T7 these are available in data folder
+# For the totals at T1, T3 and T5 these are available in data folder
 # For others, need to fit and store locally
+EmT1 <- load_ExUQmogp('applications/raikoke/data/EmT1/train')
 EmT3 <- load_ExUQmogp('applications/raikoke/data/EmT3/train')
 EmT5 <- load_ExUQmogp('applications/raikoke/data/EmT5/train')
-EmT7 <- load_ExUQmogp('applications/raikoke/data/EmT7/train')
 
+EmT1_MET <- LoadMulti('applications/raikoke/data/EmT1_MET', 'train')
 EmT3_MET <- LoadMulti('applications/raikoke/data/EmT3_MET', 'train')
 EmT5_MET <- LoadMulti('applications/raikoke/data/EmT5_MET', 'train')
-EmT7_MET <- LoadMulti('applications/raikoke/data/EmT7_MET', 'train')
 
 # Regions, overall
 EmRegion1 <- load_ExUQmogp('applications/raikoke/data/EmRegion/region1')
@@ -60,11 +60,11 @@ EmRegion6_MET <- LoadMulti('applications/raikoke/data/EmRegion_MET/region6', 're
 EmRegion7_MET <- LoadMulti('applications/raikoke/data/EmRegion_MET/region7', 'region7')
 EmRegion8_MET <- LoadMulti('applications/raikoke/data/EmRegion_MET/region8', 'region8')
 
-# Predict at T3/T5/T7 using a) overall emulator and b) each of the 18 MET emulators
+# Predict at T1/T3/T5 using a) overall emulator and b) each of the 18 MET emulators
 # Each of these objects is relatively large (mean, variance at N points for 19 emulators), hence not stored in Github
+PredT1 <- PredictBoth(EmT1, EmT1_MET, CalDesignScaled)
 PredT3 <- PredictBoth(EmT3, EmT3_MET, CalDesignScaled)
 PredT5 <- PredictBoth(EmT5, EmT5_MET, CalDesignScaled)
-PredT7 <- PredictBoth(EmT7, EmT7_MET, CalDesignScaled)
 PredR1 <- PredictBoth(EmRegion1, EmRegion1_MET, CalDesignScaled)
 PredR2 <- PredictBoth(EmRegion2, EmRegion2_MET, CalDesignScaled)
 PredR3 <- PredictBoth(EmRegion3, EmRegion3_MET, CalDesignScaled)
@@ -75,15 +75,20 @@ PredR7 <- PredictBoth(EmRegion7, EmRegion7_MET, CalDesignScaled)
 PredR8 <- PredictBoth(EmRegion8, EmRegion8_MET, CalDesignScaled)
 
 # Calculating implausibility for the overall emulator
+implT1 <- abs(scale_output + PredT1$overall$Mean - subset(obs, Type == 'T1')$Mean) / sqrt(PredT1$overall$SD^2 + subset(obs, Type == 'T1')$Var)
 implT3 <- abs(scale_output + PredT3$overall$Mean - subset(obs, Type == 'T3')$Mean) / sqrt(PredT3$overall$SD^2 + subset(obs, Type == 'T3')$Var)
 implT5 <- abs(scale_output + PredT5$overall$Mean - subset(obs, Type == 'T5')$Mean) / sqrt(PredT5$overall$SD^2 + subset(obs, Type == 'T5')$Var)
-implT7 <- abs(scale_output + PredT7$overall$Mean - subset(obs, Type == 'T7')$Mean) / sqrt(PredT7$overall$SD^2 + subset(obs, Type == 'T7')$Var)
 
 bound <- 3 # standard threshold
-c(sum(implT3 < bound), sum(implT5 < bound), sum(implT7 < bound)) # NROY at each time point independently
-sum(implT3 < bound & implT5 < bound & implT7 < bound) # NROY for all time points
+c(sum(implT1 < bound), sum(implT3 < bound), sum(implT5 < bound)) # NROY at each time point independently
+sum(implT1 < bound & implT3 < bound & implT5 < bound) # NROY for all time points
 
 # Repeating for each MET emulator, each time
+implT1_MET <- matrix(0, N, 18)
+for (j in 1:18){
+  implT1_MET[,j] <- abs(scale_output + PredT1$met[[j]]$Mean - subset(obs, Type == 'T1')$Mean) / sqrt(PredT1$met[[j]]$SD^2 + subset(obs, Type == 'T1')$Var)
+}
+
 implT3_MET <- matrix(0, N, 18)
 for (j in 1:18){
   implT3_MET[,j] <- abs(scale_output + PredT3$met[[j]]$Mean - subset(obs, Type == 'T3')$Mean) / sqrt(PredT3$met[[j]]$SD^2 + subset(obs, Type == 'T3')$Var)
@@ -94,28 +99,23 @@ for (j in 1:18){
   implT5_MET[,j] <- abs(scale_output + PredT5$met[[j]]$Mean - subset(obs, Type == 'T5')$Mean) / sqrt(PredT5$met[[j]]$SD^2 + subset(obs, Type == 'T5')$Var)
 }
 
-implT7_MET <- matrix(0, N, 18)
-for (j in 1:18){
-  implT7_MET[,j] <- abs(scale_output + PredT7$met[[j]]$Mean - subset(obs, Type == 'T7')$Mean) / sqrt(PredT7$met[[j]]$SD^2 + subset(obs, Type == 'T7')$Var)
-}
-
 # Finding size of NROY under different assumptions, for different time points, different emulators
-NROY_T3 <- data.frame(Overall = sum(implT3 < bound), # just considering the overall emulator
-                      Strict = sum(apply(implT3_MET < bound, 1, sum) == 18), # all 18 METs must pass
-                      Conservative = sum(apply(implT3_MET < bound, 1, sum) > 0), # any single MET can be not implausible
-                      Pseudo = sum(apply(implT3_MET < bound, 1, sum) >= 9)) # at least half of METs are not implausible
+NROY_T1 <- data.frame(Overall = sum(implT1 < bound), # just considering the overall emulator
+                      Strict = sum(apply(implT1_MET < bound, 1, sum) == 18), # all 18 METs must pass
+                      Conservative = sum(apply(implT1_MET < bound, 1, sum) > 0), # any single MET can be not implausible
+                      Pseudo = sum(apply(implT1_MET < bound, 1, sum) >= 9)) # at least half of METs are not implausible
 
-# Same, but for T3 and T5
-NROY_T5 <- data.frame(Overall = sum(implT3 < bound & implT5 < bound),
-                      Strict = sum(apply(implT3_MET < bound, 1, sum) == 18 & apply(implT5_MET < bound, 1, sum) == 18),
-                      Conservative = sum(apply(implT3_MET < bound, 1, sum) > 0 & apply(implT5_MET < bound, 1, sum) > 0),
-                      Pseudo = sum(apply(implT3_MET < bound, 1, sum) >= 9 & apply(implT5_MET < bound, 1, sum) >= 9))
+# Same, but for T1 and T3
+NROY_T3 <- data.frame(Overall = sum(implT1 < bound & implT3 < bound),
+                      Strict = sum(apply(implT1_MET < bound, 1, sum) == 18 & apply(implT3_MET < bound, 1, sum) == 18),
+                      Conservative = sum(apply(implT1_MET < bound, 1, sum) > 0 & apply(implT3_MET < bound, 1, sum) > 0),
+                      Pseudo = sum(apply(implT1_MET < bound, 1, sum) >= 9 & apply(implT3_MET < bound, 1, sum) >= 9))
 
-# Same, but for T3, T5 and T7
-NROY_T7 <- data.frame(Overall = sum(implT3 < bound & implT5 < bound & implT7 < bound),
-                      Strict = sum(apply(implT3_MET < bound, 1, sum) == 18 & apply(implT5_MET < bound, 1, sum) == 18 & apply(implT7_MET < bound, 1, sum) == 18),
-                      Conservative = sum(apply(implT3_MET < bound, 1, sum) > 0 & apply(implT5_MET < bound, 1, sum) > 0 & apply(implT7_MET < bound, 1, sum) > 0),
-                      Pseudo = sum(apply(implT3_MET < bound, 1, sum) >= 9 & apply(implT5_MET < bound, 1, sum) >= 9 & apply(implT7_MET < bound, 1, sum) >= 9))
+# Same, but for T1, T3 and T5
+NROY_T5 <- data.frame(Overall = sum(implT1 < bound & implT3 < bound & implT5 < bound),
+                      Strict = sum(apply(implT1_MET < bound, 1, sum) == 18 & apply(implT3_MET < bound, 1, sum) == 18 & apply(implT5_MET < bound, 1, sum) == 18),
+                      Conservative = sum(apply(implT1_MET < bound, 1, sum) > 0 & apply(implT3_MET < bound, 1, sum) > 0 & apply(implT5_MET < bound, 1, sum) > 0),
+                      Pseudo = sum(apply(implT1_MET < bound, 1, sum) >= 9 & apply(implT3_MET < bound, 1, sum) >= 9 & apply(implT5_MET < bound, 1, sum) >= 9))
 
 # N+S (R1, R2)
 implR1 <- abs(scale_output + PredR1$overall$Mean - subset(obs, Type == 'N')$Mean) / sqrt(PredR1$overall$SD^2 + subset(obs, Type == 'N')$Var)

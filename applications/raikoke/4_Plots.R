@@ -4,9 +4,9 @@ source("applications/raikoke/0_Source.R")
 # Create some plots
 # For validation plots, see 1_Emulation.R
 
+tDataT1 <- readRDS("applications/raikoke/data/tDataT1.rds")
 tDataT3 <- readRDS("applications/raikoke/data/tDataT3.rds")
 tDataT5 <- readRDS("applications/raikoke/data/tDataT5.rds")
-tDataT7 <- readRDS("applications/raikoke/data/tDataT7.rds")
 tData_regions <- readRDS("applications/raikoke/data/tData_regions.rds")
 
 # Find 95% intervals
@@ -17,30 +17,30 @@ obs$Upper <- obs$Mean + 1.96*sqrt(obs$Var)
 # All on log scale here
 scale_output <- log(0.95)
 
-# Plotting T3 total vs T7 total
-plot_data <- data.frame(T3 = tDataT3$LogTotal + scale_output,
-                        T7 = tDataT7$LogTotal + scale_output,
+# Plotting T1 total vs T5 total
+plot_data <- data.frame(T1 = tDataT1$LogTotal + scale_output,
+                        T5 = tDataT5$LogTotal + scale_output,
                         m = as.factor(design$MET),
                         logMER = design$logMER,
                         msigU = design$m_sigU)
 
-obsT3 <- subset(obs, Type == 'T3')
-obsT7 <- subset(obs, Type == 'T7')
+obsT1 <- subset(obs, Type == 'T1')
+obsT5 <- subset(obs, Type == 'T5')
 
-ggplot(data = tmp, aes(x = T3, y = T7, col = m)) +
+ggplot(data = tmp, aes(x = T1, y = T5, col = m)) +
   geom_point() +
-  geom_vline(xintercept = c(obsT3$Mean, obsT3$Lower, obsT3$Upper), linetype = c('solid', 'dashed', 'dashed')) +
-  geom_hline(yintercept = c(obsT7$Mean, obsT7$Lower, obsT7$Upper), linetype = c('solid', 'dashed', 'dashed')) +
-  labs(x = 'Log total ash column load, T3', y = 'Log total ash column load, T7')
+  geom_vline(xintercept = c(obsT1$Mean, obsT1$Lower, obsT1$Upper), linetype = c('solid', 'dashed', 'dashed')) +
+  geom_hline(yintercept = c(obsT5$Mean, obsT5$Lower, obsT5$Upper), linetype = c('solid', 'dashed', 'dashed')) +
+  labs(x = 'Log total ash column load, T1', y = 'Log total ash column load, T5')
 
 # Alternative colour schemes
-ggplot(data = plot_data, aes(x = T3, y = T7, col = m)) +
+ggplot(data = plot_data, aes(x = T1, y = T5, col = m)) +
   geom_point() +
   scale_color_viridis_d(option = 'D') +
   geom_vline(xintercept = c(26.75,25.8,27.55), linetype = c('solid', 'dashed', 'dashed')) +
   geom_hline(yintercept = c(26.3,25.9,26.8), linetype = c('solid', 'dashed', 'dashed'))
   
-ggplot(data = subset(plot_data, m %in% 1:16), aes(x = T3, y = T7, col = msigU)) +
+ggplot(data = subset(plot_data, m %in% 1:16), aes(x = T1, y = T5, col = msigU)) +
   geom_point() +
   facet_wrap(vars(m)) +
   geom_abline(intercept = -3.871, slope = 1.070) +
