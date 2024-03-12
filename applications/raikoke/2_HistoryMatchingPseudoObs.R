@@ -111,6 +111,10 @@ Exp_NS_var001 <- PseudoExperiment(list(tData_regions[[1]], tData_regions[[2]]),
                                 list(EnsPredRegion1, EnsPredRegion2),
                                 obs_error = 0.01 * ObsVar)
 
+SummariseExperiment(Exp_NS_var1)
+SummariseExperiment(Exp_NS_var01)
+SummariseExperiment(Exp_NS_var001)
+
 # W+E (R3+R4)
 ObsVar <- c(subset(obs, Type == 'W')$Var, subset(obs, Type == 'E')$Var)
 Exp_WE_var1 <- PseudoExperiment(list(tData_regions[[3]], tData_regions[[4]]),
@@ -126,6 +130,10 @@ Exp_WE_var001 <- PseudoExperiment(list(tData_regions[[3]], tData_regions[[4]]),
                                   list(EnsPredRegion3, EnsPredRegion4),
                                   obs_error = 0.01 * ObsVar)
 
+SummariseExperiment(Exp_WE_var1)
+SummariseExperiment(Exp_WE_var01)
+SummariseExperiment(Exp_WE_var001)
+
 # 4 regions (R5+R6+R7+R8)
 ObsVar <- c(subset(obs, Type == 'NW')$Var, subset(obs, Type == 'NE')$Var, subset(obs, Type == 'SE')$Var, subset(obs, Type == 'SW')$Var)
 Exp_4R_var1 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
@@ -140,6 +148,10 @@ Exp_4R_var001 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], t
                                   list(val_inds, val_inds, val_inds, val_inds),
                                   list(EnsPredRegion5, EnsPredRegion6, EnsPredRegion7, EnsPredRegion8),
                                   obs_error = 0.01 * ObsVar)
+
+SummariseExperiment(Exp_4R_var1)
+SummariseExperiment(Exp_4R_var01)
+SummariseExperiment(Exp_4R_var001)
 
 # 3/4 regions, i.e. use 2nd max impl across the 4 regions (i.e. 1 allowed to 'fail')
 Exp_4Rk2_var1 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]], tData_regions[[7]], tData_regions[[8]]),
@@ -158,3 +170,6 @@ Exp_4Rk2_var001 <- PseudoExperiment(list(tData_regions[[5]], tData_regions[[6]],
                                   obs_error = 0.01 * ObsVar,
                                   kmax = 2)
 
+SummariseExperiment(Exp_4Rk2_var1)
+SummariseExperiment(Exp_4Rk2_var01)
+SummariseExperiment(Exp_4Rk2_var001)
