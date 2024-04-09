@@ -20,6 +20,7 @@ setwd('~/Dropbox/UQ/') # edit directory on local machine to where https://github
 source('code/Gasp.R')
 
 # Load inputs
+setwd('~/Dropbox/UQ/applications/SECRET')
 design_sim <- readRDS('data/systemic/design_sim.rds') # on original scale
 design_em <- readRDS('data/systemic/design_em.rds') # on [-1,1]^5
 
