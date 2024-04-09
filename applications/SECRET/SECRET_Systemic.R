@@ -12,6 +12,7 @@
 # See Example_EmulateTS.html for more detail on the emulation approach, applied to a single time series (generalises to other high dimensional output, e.g., stacking together multiple series as here)
 
 library(R.matlab)
+library(reshape2)
 
 # Basis emulation functions are found at https://github.com/JSalter90/UQ
 # Also reads a file from https://github.com/BayesExeter/ExeterUQ, edit paths in Gasp.R to reflect location of this
@@ -146,4 +147,60 @@ truth_em
 # We've also likely removed parts of space that lead to very different behaviour, hence no longer trying to capture this with the emulators
 
 #### Wave 2 ####
+# Ordinarily we'd want to sample from NROY generally, and run new sim,ulations
+# Because of the time-limited nature of SECRET, and Matlab license/internet connection issues, we instead sampled the 200 new points from the existing validation set
+inNROY1 <- which(Val_impl1$inNROY)
 
+nroy_design <- val_design[inNROY1,]
+nroy_flows <- val_full[,inNROY1]
+
+set.seed(321039)
+w2_inds <- sample(1:nrow(nroy_design), n)
+
+train_full_w2 <- nroy_flows[,w2_inds]
+val_full_w2 <- nroy_flows[,-w2_inds]
+
+train_design_w2 <- nroy_design[w2_inds,]
+val_design_w2 <- nroy_design[-w2_inds,]
+
+# New basis
+DataBasis_full_w2 <- MakeDataBasis(train_full_w2)
+q_full_w2 <- ExplainT(DataBasis_full_w2, vtot = 0.99)
+Coeffs_full_w2 <- Project(data = DataBasis_full_w2$CentredField, basis = DataBasis_full_w2$tBasis[,1:q_full_w2])
+tData_full_w2 <- data.frame(train_design_w2[,1:5], Noise = runif(n), Coeffs_full_w2)
+
+# As a sanity check - does our basis better represent the observations now?
+ReconError(obs - DataBasis_full$EnsembleMean, basis = DataBasis_full$tBasis[,1:q_full], scale = FALSE)
+ReconError(obs - DataBasis_full_w2$EnsembleMean, basis = DataBasis_full_w2$tBasis[,1:q_full_w2], scale = FALSE)
+
+# New emulators
+em_full_w2 <- BasisEmulators(tData_full_w2, q_full_w2, mean_fn = 'step', maxdf = NULL, training_prop = 1)
+par(mfrow=c(3,3), mar=c(4,4,2,2))
+LeaveOneOut(em_full_w2[[1]]);LeaveOneOut(em_full_w2[[2]]);LeaveOneOut(em_full_w2[[3]]);LeaveOneOut(em_full_w2[[4]])
+LeaveOneOut(em_full_w2[[5]]);LeaveOneOut(em_full_w2[[6]]);LeaveOneOut(em_full_w2[[7]]);LeaveOneOut(em_full_w2[[8]]);LeaveOneOut(em_full_w2[[9]])
+
+# Predict across large LHC
+Big_preds1_w2 <- BasisPredGasp(BigDesign, em_full_w2)
+
+# History match
+# The choice of 'observation error' is again arbitrary here as really it's zero
+Err_w2 <- 0.25*diag(512*7)
+Winv_w2 <- GetInverse(Err_w2)
+Big_impl1_w2 <- HistoryMatch(DataBasis_full_w2, 
+                             obs - DataBasis_full_w2$EnsembleMean, 
+                             Big_preds1_w2$Expectation, 
+                             Big_preds1_w2$Variance, 
+                             Error = Err_w2, 
+                             Disc = 0*Err_w2, 
+                             weightinv = Winv_w2)
+# Need to check which points are in NROY for both w1 and w2:
+sum(Big_impl1$inNROY & Big_impl1_w2$inNROY)
+
+
+Val_preds1_w2 <- BasisPredGasp(val_design_w2, em_full_w2)
+Val_impl1_w2 <- HistoryMatch(DataBasis_full_w2, obs - DataBasis_full_w2$EnsembleMean, Val_preds1_w2$Expectation, Val_preds1_w2$Variance, Error = Err_w2, Disc = 0*diag(dim(Err_w2)[1]), weightinv = Winv_w2)
+Val_impl1_w2$nroy
+
+BigDesign[which.min(Big_impl1$impl),]
+BigDesign[which.min(Big_impl1_w2$impl),]
+truth_em
