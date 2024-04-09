@@ -82,3 +82,35 @@ Big_preds_pressure <- BasisPredGasp(BigDesign, em_pressure)
 
 
 
+
+#### Wave 2 ####
+designW2 <- readRDS('data/pulmonary/designW2.rds') # on original scale
+
+# Scale to [-1,1]^4
+designW2_em <- designW2
+designW2_em$kMV <- (designW2$kMV - 9*10^4) / ((3*10^5 - 9*10^4)/2) - 1
+designW2_em$alpha <- (designW2$alpha - 0.83) / ((0.89 - 0.83)/2) - 1
+designW2_em$lrrA <- (designW2$lrrA - 20) / ((50 - 20)/2) - 1
+designW2_em$lrrV <- (designW2$lrrV - 20) / ((50 - 20)/2) - 1
+
+# Load outputs
+outputW2 <- readRDS('data/pulmonary/outputW2.rds')
+
+
+
+#### Wave 3 ####
+designW3 <- readRDS('data/pulmonary/designW3.rds') # on original scale
+
+# Scale to [-1,1]^4
+designW3_em <- designW3
+designW3_em$kMV <- (designW3$kMV - 9*10^4) / ((3*10^5 - 9*10^4)/2) - 1
+designW3_em$alpha <- (designW3$alpha - 0.83) / ((0.89 - 0.83)/2) - 1
+designW3_em$lrrA <- (designW3$lrrA - 20) / ((50 - 20)/2) - 1
+designW3_em$lrrV <- (designW3$lrrV - 20) / ((50 - 20)/2) - 1
+
+# Load outputs
+outputW3 <- readRDS('data/pulmonary/outputW3.rds')
+
+
+
+
