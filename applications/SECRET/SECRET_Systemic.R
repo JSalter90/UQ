@@ -1,2 +1,149 @@
 # SECRET competition, September 2023
 # Code for systemic model, Exeter team
+
+# Exact results may differ when run this code, as some randomness involved - 
+# selecting initial training dataset
+# fitting mean function uses a noise vector (shouldn't make much/any difference)
+# sampling wave 2 from current NROY
+# sampling new points at wave 3/4
+
+# We've reproduced the exact same results up to end of wave 2
+
+# See Example_EmulateTS.html for more detail on the emulation approach, applied to a single time series (generalises to other high dimensional output, e.g., stacking together multiple series as here)
+
+library(R.matlab)
+
+# Basis emulation functions are found at https://github.com/JSalter90/UQ
+# Also reads a file from https://github.com/BayesExeter/ExeterUQ, edit paths in Gasp.R to reflect location of this
+setwd('~/Dropbox/UQ/') # edit directory on local machine to where https://github.com/JSalter90/UQ is cloned
+source('code/Gasp.R')
+
+# Load inputs
+design_sim <- readRDS('data/systemic/design_sim.rds') # on original scale
+design_em <- readRDS('data/systemic/design_em.rds') # on [-1,1]^5
+
+# Load data
+flow_all <- readRDS("data/systemic/flow_all.rds") # 512x1250x7
+maxmin_all <- readRDS("data/systemic/maxmin_all.rds") # 1250x3
+
+# Stacking flows to emulate simultaneously (ignored the max/min pressure, but these could be added to the end of the output vector)
+flow_stacked <- aperm(flow_all, c(1,3,2)) # changing to 512x7x1250
+dim(flow_stacked) <- c(512*7, nrow(design_em)) # vectorising output
+
+# Load observations
+obs <- c(readMat('data/systemic/obs.mat')[[1]]) # also vectorising, ignoring pressure
+
+# At the time, the true inputs were unknown
+# Included here so can plot truth alongside history matching results
+truth <- data.frame(f2 = -32.9,
+                      f3 = 426000,
+                      fs2 = -40.6,
+                      fs3 = 643000,
+                      alpha = 0.88)
+
+# Scaled
+truth_em <- truth
+truth_em[,1] <- (truth_em[,1] + 45) / ((20)/2) - 1
+truth_em[,2] <- (truth_em[,2] - 2*10^5) / ((7*10^5)/2) - 1
+truth_em[,3] <- (truth_em[,3] + 45) / ((20)/2) - 1
+truth_em[,4] <- (truth_em[,4] - 2*10^5) / ((7*10^5)/2) - 1
+truth_em[,5] <- (truth_em[,5] - 0.85) / ((0.09)/2) - 1
+
+# We know the 'true' implausibility of all runs (i.e, we use the model output, with emulator variance = 0)
+true_impl <- numeric(ncol(flow_stacked))
+for (i in 1:length(true_impl)){
+  true_impl[i] <- sum((obs - flow_stacked[,i])^2) # assuming obs error = 1
+}
+inNROY <- which(true_impl < qchisq(0.995, 512*7))
+design_em[inNROY,]
+
+# Split into train/validation
+n <- 200 # number of training points
+set.seed(37281)
+samp <- sample(1:nrow(design_em), nrow(design_em))
+train_inds <- samp[1:n]
+val_inds <- samp[-c(1:n)]
+
+train_design <- design_em[train_inds,]
+val_design <- design_em[val_inds,]
+
+train_full <- flow_stacked[,train_inds]
+val_full <- flow_stacked[,val_inds]
+
+# Construct basis, project, create emulator data
+DataBasis_full <- MakeDataBasis(train_full) # centres the data, calculates basis
+q_full <- ExplainT(DataBasis_full, vtot = 0.99) # vectors required to explain 99% (arbitrary; chosen here after experimentation showed that it was possible to emulate these vectors, and that adding more added little)
+Coeffs_full <- Project(data = DataBasis_full$CentredField, basis = DataBasis_full$tBasis[,1:q_full]) # project centred data onto basis
+tData_full <- data.frame(train_design[,1:5], Noise = runif(n), Coeffs_full) # combining inputs with coefficients
+
+# Fit emulator
+# As above, these settings chosen based on prior experimentation with the systemic model
+em_full <- BasisEmulators(tData_full, q_full, mean_fn = 'step', maxdf = NULL, training_prop = 1)
+
+# LOO cross-validation, could also consider predicting on validation set
+par(mfrow=c(2,2), mar=c(4,4,2,2))
+LeaveOneOut(em_full[[1]]);LeaveOneOut(em_full[[2]]);LeaveOneOut(em_full[[3]]);LeaveOneOut(em_full[[4]])
+LeaveOneOut(em_full[[5]]);LeaveOneOut(em_full[[6]]);LeaveOneOut(em_full[[7]]);LeaveOneOut(em_full[[8]])
+
+# Broadly ok, nothing systematically wrong, and generally ok close to the observations
+obs_coeffs <- Project(obs - DataBasis_full$EnsembleMean,
+                      DataBasis_full$tBasis[,1:q_full])
+
+# Predict across large LHC
+BigDesign <- 2*as.data.frame(randomLHS(100000, 5)) - 1
+colnames(BigDesign) <- colnames(design_em)[1:5]
+Big_preds1 <- BasisPredGasp(BigDesign, em_full)
+
+# History match
+# $Expectation and $Variance should be matrices with size (number of rows in BigDesign) x q
+# j^th column should be Expectation (Variance) of j^th coefficient
+# This code very efficiently calculates implausibility (over original field), but to do so requires argument weightinv = W^{-1}, where W = Var_e + Var_{disc}
+# To allow this to be efficient, weightinv must have a certain structure (it requires attributes flagging whether it is identity/diagonal or more complex)
+# However, if you generate this inverse using GetInverse, it will automatically generate this in the correct form
+Err <- 1*diag(512*7) # uncorrelated error, with arbitrary variance as in theory this is zero
+Winv <- GetInverse(Err) # creating inverse
+Big_impl1 <- HistoryMatch(DataBasis_full, 
+                          obs - DataBasis_full$EnsembleMean, 
+                          Big_preds1$Expectation, 
+                          Big_preds1$Variance, 
+                          Error = Err, 
+                          Disc = 0*Err, 
+                          weightinv = Winv)
+Big_impl1$nroy # proportion of input space in NROY
+Big_impl1$bound # taken from chi-squared with ell = 512*7 degrees of freedom
+
+# Visualising NROY
+library(GGally)
+BigDesign$NROY <- Big_impl1$inNROY
+k <- 1:5
+p <- ggpairs(BigDesign[1:10000,], columns=k,
+             ggplot2::aes(color=NROY) , upper = list(continuous = wrap("density", alpha = 0.5), combo = "box_no_facet"),
+             lower = list(continuous = wrap("points", alpha = 0.3), combo = wrap("dot_no_facet", alpha = 0.4)),
+             diag = list(continuous = wrap("densityDiag", alpha = 0.3)),
+             legend = 1) +
+  theme(legend.position = "bottom") + scale_colour_manual(values = c("#F8766D", "#00BFC4")) +
+  scale_fill_manual(values = c("#F8766D", "#00BFC4"))
+# Add truth
+for(i in 1:length(k)) {
+  p1 <- getPlot(p, i, i) + geom_vline(xintercept = as.numeric(truth_em[k[i]]))
+  p <- putPlot(p, p1, i, i)
+}
+p
+
+# Instead, evaluate at known runs
+Val_preds1 <- BasisPredGasp(val_design, em_full)
+Val_impl1 <- HistoryMatch(DataBasis_full, obs - DataBasis_full$EnsembleMean, Val_preds1$Expectation, Val_preds1$Variance, Error = Err, Disc = 0*diag(dim(Err)[1]), weightinv = Winv)
+Val_impl1$nroy
+
+# Minimum implausibility across 100k samples, known runs, vs truth
+BigDesign[which.min(Big_impl1$impl),]
+val_design[which.min(Val_impl1$impl),]
+truth_em
+
+# Unsurprisingly, not perfect after only 1 wave - emulator variance not negligible - only used 200 training points
+# However, now we can sample from NROY, and train new emulators with these new runs
+# The emulators should be more accurate, as now have denser training samples in the region of parameter space closer to the observations
+# We've also likely removed parts of space that lead to very different behaviour, hence no longer trying to capture this with the emulators
+
+#### Wave 2 ####
+
