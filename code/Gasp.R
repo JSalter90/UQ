@@ -254,6 +254,7 @@ ValidateGasp <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
 }
 
 LeaveOneOut <- function(emulator){
+  require(sfsmisc)
   em <- emulator$em
   loo_preds <- leave_one_out_rgasp(em)
   loo_preds$lower95 <- loo_preds$mean - 1.96*loo_preds$sd
