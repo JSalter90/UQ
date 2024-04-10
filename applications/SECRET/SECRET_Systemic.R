@@ -25,8 +25,8 @@ design_sim <- readRDS('data/systemic/design_sim.rds') # on original scale
 design_em <- readRDS('data/systemic/design_em.rds') # on [-1,1]^5
 
 # Load data
-flow_all <- readRDS("data/systemic/flow_all.rds") # 512x1250x7
-maxmin_all <- readRDS("data/systemic/maxmin_all.rds") # 1250x3
+flow_all <- readRDS("data/systemic/flow_all.rds") # 7 flow series across design, 512x1250x7
+maxmin_all <- readRDS("data/systemic/maxmin_all.rds") # max/min pressure across design, 1250x3
 
 # Stacking flows to emulate simultaneously (ignored the max/min pressure, but these could be added to the end of the output vector)
 flow_stacked <- aperm(flow_all, c(1,3,2)) # changing to 512x7x1250
@@ -87,20 +87,24 @@ par(mfrow=c(2,2), mar=c(4,4,2,2))
 LeaveOneOut(em_full[[1]]);LeaveOneOut(em_full[[2]]);LeaveOneOut(em_full[[3]]);LeaveOneOut(em_full[[4]])
 LeaveOneOut(em_full[[5]]);LeaveOneOut(em_full[[6]]);LeaveOneOut(em_full[[7]]);LeaveOneOut(em_full[[8]])
 
-# Broadly ok, nothing systematically wrong, and generally ok close to the observations
+# Broadly ok, nothing systematically wrong, and generally ok close to the observations:
 obs_coeffs <- Project(obs - DataBasis_full$EnsembleMean,
                       DataBasis_full$tBasis[,1:q_full])
 
 # Predict across large LHC
-BigDesign <- 2*as.data.frame(randomLHS(100000, 5)) - 1
-colnames(BigDesign) <- colnames(design_em)[1:5]
+# BigDesign <- 2*as.data.frame(randomLHS(100000, 5)) - 1
+# colnames(BigDesign) <- colnames(design_em)[1:5]
+# Load from file for consistency
+BigDesign <- readRDS('data/systemic/BigDesign.rds')
+
+# Predict across design
 Big_preds1 <- BasisPredGasp(BigDesign, em_full)
 
 # History match
 # $Expectation and $Variance should be matrices with size (number of rows in BigDesign) x q
 # j^th column should be Expectation (Variance) of j^th coefficient
 # This code very efficiently calculates implausibility (over original field), but to do so requires argument weightinv = W^{-1}, where W = Var_e + Var_{disc}
-# To allow this to be efficient, weightinv must have a certain structure (it requires attributes flagging whether it is identity/diagonal or more complex)
+# To allow this to be efficient, weightinv must have a certain structure (it requires attributes flagging whether it is identity, diagonal or more complex)
 # However, if you generate this inverse using GetInverse, it will automatically generate this in the correct form
 Err <- 1*diag(512*7) # uncorrelated error, with arbitrary variance as in theory this is zero
 Winv <- GetInverse(Err) # creating inverse
@@ -118,7 +122,7 @@ Big_impl1$bound # taken from chi-squared with ell = 512*7 degrees of freedom
 library(GGally)
 BigDesign$NROY <- Big_impl1$inNROY
 k <- 1:5
-p <- ggpairs(BigDesign[1:10000,], columns=k,
+p <- ggpairs(BigDesign[1:5000,], columns=k,
              ggplot2::aes(color=NROY) , upper = list(continuous = wrap("density", alpha = 0.5), combo = "box_no_facet"),
              lower = list(continuous = wrap("points", alpha = 0.3), combo = wrap("dot_no_facet", alpha = 0.4)),
              diag = list(continuous = wrap("densityDiag", alpha = 0.3)),
@@ -155,7 +159,7 @@ inNROY1 <- which(Val_impl1$inNROY)
 nroy_design <- val_design[inNROY1,]
 nroy_flows <- val_full[,inNROY1]
 
-set.seed(321039)
+set.seed(580) # a seed was not used during the 3 hour timeframe of the competition
 w2_inds <- sample(1:nrow(nroy_design), n)
 
 train_full_w2 <- nroy_flows[,w2_inds]
@@ -194,14 +198,39 @@ Big_impl1_w2 <- HistoryMatch(DataBasis_full_w2,
                              Error = Err_w2, 
                              Disc = 0*Err_w2, 
                              weightinv = Winv_w2)
-# Need to check which points are in NROY for both w1 and w2:
+# Need points in NROY at both w1 and w2:
 sum(Big_impl1$inNROY & Big_impl1_w2$inNROY)
 
+# Plot
+BigDesign$NROY2 <- Big_impl1$inNROY & Big_impl1_w2$inNROY
+p <- ggpairs(BigDesign[1:5000,], columns=k,
+             ggplot2::aes(color=NROY2) , upper = list(continuous = wrap("density", alpha = 0.5), combo = "box_no_facet"),
+             lower = list(continuous = wrap("points", alpha = 0.3), combo = wrap("dot_no_facet", alpha = 0.4)),
+             diag = list(continuous = wrap("densityDiag", alpha = 0.3)),
+             legend = 1) +
+  theme(legend.position = "bottom") + scale_colour_manual(values = c("#F8766D", "#00BFC4")) +
+  scale_fill_manual(values = c("#F8766D", "#00BFC4"))
+# Add truth
+for(i in 1:length(k)) {
+  p1 <- getPlot(p, i, i) + geom_vline(xintercept = as.numeric(truth_em[k[i]]))
+  p <- putPlot(p, p1, i, i)
+}
+p
 
-Val_preds1_w2 <- BasisPredGasp(val_design_w2, em_full_w2)
-Val_impl1_w2 <- HistoryMatch(DataBasis_full_w2, obs - DataBasis_full_w2$EnsembleMean, Val_preds1_w2$Expectation, Val_preds1_w2$Variance, Error = Err_w2, Disc = 0*diag(dim(Err_w2)[1]), weightinv = Winv_w2)
-Val_impl1_w2$nroy
-
+# Point in input space that minimises impl at w1, w2, vs truth
 BigDesign[which.min(Big_impl1$impl),]
 BigDesign[which.min(Big_impl1_w2$impl),]
+order(Big_impl1_w2$impl)[1:10]
+Big_impl1$impl[order(Big_impl1_w2$impl)[1:10]] # these 'best' 10 all in W1 NROY as well
 truth_em
+
+# Would usually now sample from NROY, do new simulations, refit emulators, etc. (as emulator uncertainty can likely still be reduced, so should be able to zoom in further)
+# Due to issues with running new simulations (University Matlab licensing issues) and time constraints, only performed 10 new simulations
+# These were chosen as the 10 points in the 100k of BigDesign that minimised the W2 implausibility
+# Ordinarily, would do space-filling in NROY, but aim of competition is to find run as close as possible to z
+
+#### Wave 3 ####
+# The 10 selected points from above may not be exactly the same, however should generally identify same region of input space
+# Here, load in the 10 new simulations
+
+
