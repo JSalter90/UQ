@@ -232,5 +232,39 @@ truth_em
 #### Wave 3 ####
 # The 10 selected points from above may not be exactly the same, however should generally identify same region of input space
 # Here, load in the 10 new simulations
+flow_W3 <- readRDS('data/systemic/flow_W3.rds')
+design_W3 <- readRDS('data/systemic/design_W3.rds')
+
+# Have we identified better simulations at each wave?
+true_impl_w1 <- numeric(n)
+for (i in 1:length(true_impl_w1)){
+  true_impl_w1[i] <- sum((obs - train_full[,i])^2)
+}
+
+true_impl_w2 <- numeric(n)
+for (i in 1:length(true_impl_w2)){
+  true_impl_w2[i] <- sum((obs - train_full_w2[,i])^2)
+}
+
+true_impl_w3 <- numeric(nrow(design_W3))
+for (i in 1:length(true_impl_w3)){
+  true_impl_w3[i] <- sum((obs - flow_W3[,i])^2)
+}
+
+# Most summaries decrease - on average finding simulations closer to the truth
+summary(true_impl_w1)
+summary(true_impl_w2) # the 'best' (i.e. minimum impl) simulation in wave 2 is not better than wave 1. Ordinarily we wouldn't expect this, however we were sampling from a finite set of 1250 runs, and had by chance already included the run with minimum impl out of these 1250. Hence W2 design was guaranteed to not reduce this  
+summary(true_impl_w3)
 
 
+#### Wave 4 ####
+flow_W4 <- readRDS('data/systemic/flow_W4.rds')
+design_W4 <- readRDS('data/systemic/design_W4.rds')
+
+true_impl_w4 <- numeric(nrow(design_W4))
+for (i in 1:length(true_impl_w4)){
+  true_impl_w4[i] <- sum((obs - flow_W4[,i])^2)
+}
+
+# Generally closer again, as well as finding run with lower implausibility
+summary(true_impl_w4)
