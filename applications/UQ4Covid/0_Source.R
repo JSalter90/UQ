@@ -3,7 +3,14 @@
 library(ggplot2)
 library(PLNmodels)
 
-# Process into data matrix
+# Loading data
+# Model inputs
+design <- read.csv('data/design.csv')
+
+# Corresponding outputs, on LAD level
+output_LAD <- readRDS('data/output_LAD.rds')
+
+# Processing into data matrix
 ProcessData <- function(data, by_id = 'LAD19CD', output = 'deaths'){
   # Info on locations
   location_ids <- unique(data[,by_id])
@@ -17,15 +24,12 @@ ProcessData <- function(data, by_id = 'LAD19CD', output = 'deaths'){
   stopifnot(n == nrow(data) / ell)
   
   data_matrix <- matrix(0, ell, n)
-  
   for (i in 1:n){
     tmp_data <- subset(data, output == run_ids$output[i] & replicate == run_ids$replicate[i])[,c(by_id,output)]
-    
     # Map to same ordering as in location_ids
     tmp_data <- left_join(as.data.frame(location_ids), 
                           tmp_data, 
                           by = c('location_ids' = paste0(by_id)))
-    
     # Add to matrix
     data_matrix[,i] <- tmp_data[,output]
   }
@@ -35,28 +39,28 @@ ProcessData <- function(data, by_id = 'LAD19CD', output = 'deaths'){
               run = run_ids))
 }
 
-# Example
-output_LAD <- readRDS('data/output_LAD.rds')
-ens_data <- ProcessData(subset(output_LAD, week == 12 & replicate == 1))
-
-# Some checks that worked
-tmp1 <- apply(ens_data$data, 2, sum) # total deaths per run
-tmp2 <- aggregate(deaths ~ output, subset(output_LAD, week == 12 & replicate == 1), sum)$deaths
-summary(tmp1 - tmp2)
-
-tmp1 <- apply(ens_data$data, 1, sum) # total deaths per LAD across 250 runs
-tmp2 <- aggregate(deaths ~ LAD19CD, subset(output_LAD, week == 12 & replicate == 1), sum)$deaths
-summary(tmp1 - tmp2)
-
-# Hospitalisations instead
-ens_data <- ProcessData(subset(output_LAD, week == 12 & replicate == 1), output = 'cumH')
-tmp1 <- apply(ens_data$data, 2, sum)
-tmp2 <- aggregate(cumH ~ output, subset(output_LAD, week == 12 & replicate == 1), sum)$cumH
-summary(tmp1 - tmp2)
-
-tmp1 <- apply(ens_data$data, 1, sum)
-tmp2 <- aggregate(cumH ~ LAD19CD, subset(output_LAD, week == 12 & replicate == 1), sum)$cumH
-summary(tmp1 - tmp2)
+# # Example
+# output_LAD <- readRDS('data/output_LAD.rds')
+# ens_data <- ProcessData(subset(output_LAD, week == 12 & replicate == 1))
+# 
+# # Some checks that worked
+# tmp1 <- apply(ens_data$data, 2, sum) # total deaths per run
+# tmp2 <- aggregate(deaths ~ output, subset(output_LAD, week == 12 & replicate == 1), sum)$deaths
+# summary(tmp1 - tmp2)
+# 
+# tmp1 <- apply(ens_data$data, 1, sum) # total deaths per LAD across 250 runs
+# tmp2 <- aggregate(deaths ~ LAD19CD, subset(output_LAD, week == 12 & replicate == 1), sum)$deaths
+# summary(tmp1 - tmp2)
+# 
+# # Hospitalisations instead
+# ens_data <- ProcessData(subset(output_LAD, week == 12 & replicate == 1), output = 'cumH')
+# tmp1 <- apply(ens_data$data, 2, sum)
+# tmp2 <- aggregate(cumH ~ output, subset(output_LAD, week == 12 & replicate == 1), sum)$cumH
+# summary(tmp1 - tmp2)
+# 
+# tmp1 <- apply(ens_data$data, 1, sum)
+# tmp2 <- aggregate(cumH ~ LAD19CD, subset(output_LAD, week == 12 & replicate == 1), sum)$cumH
+# summary(tmp1 - tmp2)
 
 
 # Finding basis

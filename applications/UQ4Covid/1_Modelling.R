@@ -1,11 +1,10 @@
 source('code/0_Source.R')
 
-# Model inputs
-design <- read.csv('data/design.csv')
+# Inputs
+dim(design)
 
-# Corresponding outputs, on LAD level
-output_LAD <- readRDS('data/output_LAD.rds')
-nrow(output_LAD) # 1661100 = 339 LADs x 7 weeks x 700 simulations
+# Outputs
+dim(output_LAD) # 1661100 = 339 LADs x 7 weeks x 700 simulations
 
 # Plot some summaries of output, e.g. total hospitalisations vs deaths in week 12
 output_total <- aggregate(cbind(cumH, deaths) ~ output + replicate, data = subset(output_LAD, week == 12), sum)
