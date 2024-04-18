@@ -4,6 +4,13 @@
 # See Example_EmulateTS.html for more detail on the emulation approach, applied to a single time series (generalises to other high dimensional output, e.g., stacking together multiple series as here)
 
 library(R.matlab)
+library(reshape2)
+library(ggplot2)
+
+# consistent colour palette for w1-w3
+cols <- c('darkblue', viridis(100)[c(50,95)])
+obs_col <- 'green'
+truth_col <- 'turquoise'
 
 # Basis emulation functions are found at https://github.com/JSalter90/UQ
 # Also reads a file from https://github.com/BayesExeter/ExeterUQ, edit paths in Gasp.R to reflect location of this
@@ -38,6 +45,9 @@ truth <- data.frame(kMV = 2.5*10^5,
                     l = 0.1,
                     var = 5.8)
 
+# Also load in the simulator output at this value
+# This was also unknown
+true_obs <- readRDS('data/pulmonary/true_obs.rds')
 
 #### Wave 1 ####
 # Emulate using initial 100 member LHC design
@@ -85,7 +95,7 @@ Big_preds_pressure <- BasisPredGasp(BigDesign, em_pressure)
 # We have an upper bound on the variance that we can use (if rule out for high variance, also do for lower variance, given same correlation structure)
 # For correlation length, need to consider different structures
 # Aim to keep runs that are not implausible across different correlation structures
-time <- seq(from = 0, to = 0.85, length = 513)[-1]
+time <- seq(from = 0, to = 0.85, length = 513)[-1] # time domain
 Matern32 <- function(t1, t2, variance, length){
   r <- sqrt((t1 - t2)^2 / length^2)
   cov <- variance * (1 + sqrt(3)*r) * exp(-sqrt(3) * r)
@@ -129,14 +139,61 @@ for (k in 1:length(l_seq)){
   impl_pressure[,k] <- Big_impl_pressure$impl
 }
 
-apply(impl_flow1 < qchisq(0.995, 512), 2, sum)
-apply(impl_flow2 < qchisq(0.995, 512), 2, sum)
-apply(impl_pressure < qchisq(0.995, 512), 2, sum)
+# Formatting results
+w1_results <- data.frame(l = l_seq,
+                         Flow1 = apply(impl_flow1 < qchisq(0.995, 512), 2, sum) / nrow(impl_flow1),
+                         Flow2 = apply(impl_flow2 < qchisq(0.995, 512), 2, sum) / nrow(impl_flow2),
+                         Pressure = apply(impl_pressure < qchisq(0.995, 512), 2, sum) / nrow(impl_pressure),
+                         All = apply(impl_flow1 < qchisq(0.995, 512) & impl_flow2 < qchisq(0.995, 512) & impl_pressure < qchisq(0.995, 512), 2, sum) / nrow(impl_flow1))
+w1_results
 
+# Plotting NROY % by correlation length
+results_plot <- melt(w1_results, id.vars = 'l')
+ggplot(results_plot, aes(x = l, y = value, col = variable)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(vars(variable), nrow = 4) +
+  labs(x = 'Correlation length', y = 'NROY proportion', col = 'Output')
 
-#### Add plot that shows how much rule out by choice of correlation ####
-
-
+# Everything ruled out for length >= 0.2
+# But don't rule out any choices of x for some correlation structures (because we've been conservative and set variance at its max)
+# So when designing wave 2, all choices of x are still possible (but we have ruled out lots of choices of l)
+# Ideally want new samples in better parts of space
+# Hence we sampled wave 2 based on points with relatively low implausibility, + some level of space-filling in input space
+# Took all inputs that led to implausibility in lowest 5% for any output, and any l <= 0.2, and sampled 100 points subject to maximising maximin
+# Not run here as BigDesign different, chosen design will be different
+# nroy_flow1 <- unique(c(which(impl_flow1[,1] < quantile(impl_flow1[,1], 0.05)),
+#                        which(impl_flow1[,2] < quantile(impl_flow1[,2], 0.05)),
+#                        which(impl_flow1[,3] < quantile(impl_flow1[,3], 0.05)),
+#                        which(impl_flow1[,4] < quantile(impl_flow1[,4], 0.05)),
+#                        which(impl_flow1[,5] < quantile(impl_flow1[,5], 0.05))))
+# 
+# nroy_flow2 <- unique(c(which(impl_flow2[,1] < quantile(impl_flow2[,1], 0.05)),
+#                        which(impl_flow2[,2] < quantile(impl_flow2[,2], 0.05)),
+#                        which(impl_flow2[,3] < quantile(impl_flow2[,3], 0.05)),
+#                        which(impl_flow2[,4] < quantile(impl_flow2[,4], 0.05)),
+#                        which(impl_flow2[,5] < quantile(impl_flow2[,5], 0.05))))
+# 
+# nroy_pressure <- unique(c(which(impl_pressure[,1] < quantile(impl_pressure[,1], 0.05)),
+#                           which(impl_pressure[,2] < quantile(impl_pressure[,2], 0.05)),
+#                           which(impl_pressure[,3] < quantile(impl_pressure[,3], 0.05)),
+#                           which(impl_pressure[,4] < quantile(impl_pressure[,4], 0.05)),
+#                           which(impl_pressure[,5] < quantile(impl_pressure[,5], 0.05))))
+# 
+# inNROY_w1 <- unique(c(nroy_flow1, nroy_flow2, nroy_pressure))
+# 
+# CandPoints <- BigDesign[inNROY_w1,]
+# CandDesign <- NULL
+# maximin <- numeric(100)
+# for (i in 1:100){
+#   tmp_samp <- sample(1:nrow(CandPoints), 100)
+#   CandDesign[[i]] <- CandPoints[tmp_samp,]
+#   tmp_dist <- rdist(CandPoints[tmp_samp,])
+#   diag(tmp_dist) <- 9999999 # so min isn't zero
+#   maximin[i] <- max(apply(tmp_dist, 1, min))
+# }
+# which.max(maximin)
+# designW2_em <- CandDesign[[which.max(maximin)]]
 
 
 #### Wave 2 ####
@@ -151,6 +208,47 @@ designW2_em$lrrV <- (designW2$lrrV - 20) / ((50 - 20)/2) - 1
 
 # Load outputs
 outputW2 <- readRDS('data/pulmonary/outputW2.rds')
+
+# Plotting new runs, overlaid on wave 1
+# Have successfully identified better runs
+plot_train_data <- data.frame(Time = 1:512,
+                              Run = rep(1:100, each = 512*3),
+                              Output = c(outputW1),
+                              Type = rep(c('Flow1', 'Flow2', 'Pressure'), each = 512))
+plot_train_data_w2 <- data.frame(Time = 1:512,
+                                 Run = rep(101:200, each = 512*3),
+                                 Output = c(outputW2),
+                                 Type = rep(c('Flow1', 'Flow2', 'Pressure'), each = 512))
+all_waves <- rbind(data.frame(melt(plot_train_data, id.vars = c('Time', 'Run', 'Type')), Wave = 1),
+                   data.frame(melt(plot_train_data_w2, id.vars = c('Time', 'Run', 'Type')), Wave = 2))
+
+obs_plot <- data.frame(Time = 1:512,
+                       Run = NA,
+                       Output = c(obs),
+                       Type = rep(c('Flow1', 'Flow2', 'Pressure'), each = 512))
+obs_plot <- melt(obs_plot, id.vars = c('Time', 'Run', 'Type'))
+
+true_obs_plot <- data.frame(Time = 1:512,
+                            Run = NA,
+                            Output = c(true_obs),
+                            Type = rep(c('Flow1', 'Flow2', 'Pressure'), each = 512))
+true_obs_plot <- melt(true_obs_plot, id.vars = c('Time', 'Run', 'Type'))
+
+ggplot(all_waves, aes(x = Time, y = value, linetype = as.factor(Run), col = as.factor(Wave))) +
+  geom_line(alpha = 0.75) +
+  scale_linetype_manual(values = rep(1, 200)) +
+  facet_wrap(vars(Type), nrow = 2, scales = 'free_y') +
+  theme(legend.position = 'none') +
+  scale_colour_manual(values = cols[1:2]) +
+  geom_line(data = obs_plot, col = obs_col, linetype = 1, size = 1.5) +
+  geom_line(data = true_obs_plot, col = truth_col, linetype = 1, size = 1.5) +
+  labs(y = 'Output')
+
+
+
+
+
+
 
 # Construct new basis, emulators
 # Add in all of wave 1 - didn't definitively rule out any x, so still trying to emulate everything accurately
@@ -207,6 +305,28 @@ designW3_em$lrrV <- (designW3$lrrV - 20) / ((50 - 20)/2) - 1
 
 # Load outputs
 outputW3 <- readRDS('data/pulmonary/outputW3.rds')
+
+
+# Plotting new runs, overlaid on previous waves
+# Again successfully getting closer to truth - despite fact only know the biased version
+plot_train_data_w3 <- data.frame(Time = 1:512,
+                                 Run = rep(201:300, each = 512*3),
+                                 Output = c(outputW3),
+                                 Type = rep(c('Flow1', 'Flow2', 'Pressure'), each = 512))
+all_waves <- rbind(data.frame(melt(plot_train_data, id.vars = c('Time', 'Run', 'Type')), Wave = 1),
+                   data.frame(melt(plot_train_data_w2, id.vars = c('Time', 'Run', 'Type')), Wave = 2),
+                   data.frame(melt(plot_train_data_w3, id.vars = c('Time', 'Run', 'Type')), Wave = 3))
+
+ggplot(all_waves, aes(x = Time, y = value, linetype = as.factor(Run), col = as.factor(Wave))) +
+  geom_line(alpha = 0.75) +
+  scale_linetype_manual(values = rep(1, 300)) +
+  facet_wrap(vars(Type), nrow = 2, scales = 'free_y') +
+  theme(legend.position = 'none') +
+  scale_colour_manual(values = cols[1:3]) +
+  geom_line(data = obs_plot, col = obs_col, linetype = 1, size = 1.5) +
+  geom_line(data = true_obs_plot, col = truth_col, linetype = 1, size = 1.5) +
+  labs(y = 'Output')
+
 
 # Refit basis, emulators
 DataBasis_flow1_w3 <- MakeDataBasis(cbind(outputW1[,1,], outputW2[,1,], outputW3[,1,]))
