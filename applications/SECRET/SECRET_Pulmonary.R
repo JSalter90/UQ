@@ -245,11 +245,6 @@ ggplot(all_waves, aes(x = Time, y = value, linetype = as.factor(Run), col = as.f
   labs(y = 'Output')
 
 
-
-
-
-
-
 # Construct new basis, emulators
 # Add in all of wave 1 - didn't definitively rule out any x, so still trying to emulate everything accurately
 DataBasis_flow1_w2 <- MakeDataBasis(cbind(outputW1[,1,], outputW2[,1,]))
@@ -285,12 +280,32 @@ Big_preds_flow2_w2 <- BasisPredGasp(BigDesign, em_flow2_w2)
 Big_preds_pressure_w2 <- BasisPredGasp(BigDesign, em_pressure_w2)
 
 # History match for each
-impl_flow1_w2 <- matrix(0, nrow(BigDesign), length(l_seq))
-impl_flow2_w2 <- matrix(0, nrow(BigDesign), length(l_seq))
-impl_pressure_w2 <- matrix(0, nrow(BigDesign), length(l_seq))
+# No need to calculate for all choices of l any more. Do 1st 5
+impl_flow1_w2 <- matrix(0, nrow(BigDesign), 5)
+impl_flow2_w2 <- matrix(0, nrow(BigDesign), 5)
+impl_pressure_w2 <- matrix(0, nrow(BigDesign), 5)
 
+for (k in 1:5){
+  Big_impl_flow1_w2 <- HistoryMatch(DataBasis_flow1_w2, obs[,1] - DataBasis_flow1_w2$EnsembleMean, Big_preds_flow1_w2$Expectation, Big_preds_flow1_w2$Variance, Error = Sigma_e[,,k], Disc = 0*diag(512), weightinv = Inv[[k]])
+  impl_flow1_w2[,k] <- Big_impl_flow1_w2$impl
+  
+  Big_impl_flow2_w2 <- HistoryMatch(DataBasis_flow2_w2, obs[,2] - DataBasis_flow2_w2$EnsembleMean, Big_preds_flow2_w2$Expectation, Big_preds_flow2_w2$Variance, Error = Sigma_e[,,k], Disc = 0*diag(512), weightinv = Inv[[k]])
+  impl_flow2_w2[,k] <- Big_impl_flow2_w2$impl
+  
+  Big_impl_pressure_w2 <- HistoryMatch(DataBasis_pressure_w2, obs[,3] - DataBasis_pressure_w2$EnsembleMean, Big_preds_pressure_w2$Expectation, Big_preds_pressure_w2$Variance, Error = Sigma_e[,,k], Disc = 0*diag(512), weightinv = Inv[[k]])
+  impl_pressure_w2[,k] <- Big_impl_pressure_w2$impl
+}
 
+# Formatting results
+w2_results <- data.frame(l = l_seq[1:5],
+                         Flow1 = apply(impl_flow1_w2 < qchisq(0.995, 512), 2, sum) / nrow(impl_flow1_w2),
+                         Flow2 = apply(impl_flow2_w2 < qchisq(0.995, 512), 2, sum) / nrow(impl_flow2_w2),
+                         Pressure = apply(impl_pressure_w2 < qchisq(0.995, 512), 2, sum) / nrow(impl_pressure_w2),
+                         All = apply(impl_flow1_w2 < qchisq(0.995, 512) & impl_flow2_w2 < qchisq(0.995, 512) & impl_pressure_w2 < qchisq(0.995, 512), 2, sum) / nrow(impl_flow1_w2))
+w2_results
 
+# As before, don't definitively rule out any x because of the high variance
+# Take a similar approach to designing a new wave, except this time target top 1% (emulator more accurate in parts of space we care about due to more samples here, so this should result in better runs again, rather than runs with high variance)
 
 
 #### Wave 3 ####
@@ -305,7 +320,6 @@ designW3_em$lrrV <- (designW3$lrrV - 20) / ((50 - 20)/2) - 1
 
 # Load outputs
 outputW3 <- readRDS('data/pulmonary/outputW3.rds')
-
 
 # Plotting new runs, overlaid on previous waves
 # Again successfully getting closer to truth - despite fact only know the biased version
@@ -328,7 +342,7 @@ ggplot(all_waves, aes(x = Time, y = value, linetype = as.factor(Run), col = as.f
   labs(y = 'Output')
 
 
-# Refit basis, emulators
+# Refit basis, emulators. Again append new data as haven't relly ruled out any x
 DataBasis_flow1_w3 <- MakeDataBasis(cbind(outputW1[,1,], outputW2[,1,], outputW3[,1,]))
 q1_w3 <- ExplainT(DataBasis_flow1_w3, vtot = 0.99)
 Coeffs_flow1_w3 <- CalcScores(data = DataBasis_flow1_w3$CentredField, basis = DataBasis_flow1_w3$tBasis[,1:q1_w3])
@@ -380,5 +394,16 @@ for (k in 1:4){
 apply(impl_flow1_w3 < qchisq(0.995, 512), 2, sum)
 apply(impl_flow2_w3 < qchisq(0.995, 512), 2, sum)
 apply(impl_pressure_w3 < qchisq(0.995, 512), 2, sum)
+
+# Really need to reduce the variance
+# But would be an arbitrary choice
+# For purposes of competition, clearly wants choices of (x,l,sigma^2) that maximise likelihood
+# So sample from emulators, calculate likelihood
+# Not really HM anymore, but choice of l informed by this
+
+
+
+
+
 
 
