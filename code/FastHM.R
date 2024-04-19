@@ -18,7 +18,7 @@
 #' \item{inNROY}{Vector indicating whether a parameter setting is ruled out}
 #'
 #' @export
-HistoryMatch <- function(DataBasis, Obs, Expectation, Variance, Error, Disc, weightinv = NULL, BasisUncertainty = FALSE){
+HistoryMatch <- function(DataBasis, Obs, Expectation, Variance, Error, Disc, weightinv = NULL, BasisUncertainty = TRUE){
   q <- dim(Expectation)[2]
   Basis <- DataBasis$tBasis[,1:q]
   l <- dim(Basis)[1]
@@ -27,15 +27,22 @@ HistoryMatch <- function(DataBasis, Obs, Expectation, Variance, Error, Disc, wei
   if (is.null(weightinv)){
     weightinv <- GetInverse(W)
   }
+  # Add uncertainty from discarded basis vectors?
+  if (BasisUncertainty == TRUE){
+    # These need to be projected in the same way that the emulated coefficients were
+    if (is.null(DataBasis$Winv)){
+      BasisVar <- DiscardedBasisVariance(DataBasis, q)
+    }
+    else {
+      BasisVar <- DiscardedBasisVariance(DataBasis, q, weightinv = DataBasis$Winv)
+    }
+    W <- W + BasisVar
+    weightinv <- GetInverse(W) # need to re-define W^-1 to include this extra variance, to enable fast calculation of full I(x)
+  }
   R_W <- ReconError(Obs, Basis, weightinv = weightinv, scale = FALSE)
   # Project observations onto basis if required
   if (length(Obs) == l){
     ObsProj <- CalcScores(Obs, Basis, weightinv = weightinv)
-  }
-  # Add uncertainty from discarded basis vectors?
-  if (BasisUncertainty == TRUE){
-    BasisVar <- DiscardedBasisVariance(DataBasis, q, weightinv)
-    W <- W + BasisVar
   }
   # Project variance matrices onto basis if required
   if (dim(Disc)[1] == l){
