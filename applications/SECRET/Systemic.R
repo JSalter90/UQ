@@ -103,20 +103,21 @@ Big_preds1 <- BasisPredGasp(BigDesign, em_full)
 # History match
 # $Expectation and $Variance should be matrices with size (number of rows in BigDesign) x q
 # j^th column should be Expectation (Variance) of j^th coefficient
-# This code very efficiently calculates implausibility (over original field), but to do so requires argument weightinv = W^{-1}, where W = Var_e + Var_{disc}
+# This code efficiently calculates implausibility (over original field), but to do so requires argument weightinv = W^{-1}, where W = Var_e + Var_{disc}
 # To allow this to be efficient, weightinv must have a certain structure (it requires attributes flagging whether it is identity, diagonal or more complex)
 # However, if you generate this inverse using GetInverse, it will automatically generate this in the correct form
-Err <- 1*diag(512*7) # uncorrelated error, with arbitrary variance as in theory this is zero
+Err <- 1*diag(512*7) # uncorrelated error, with arbitrary variance as in theory this is zero here
 Winv <- GetInverse(Err) # creating inverse
 Big_impl1 <- HistoryMatch(DataBasis_full, 
-                          obs - DataBasis_full$EnsembleMean, 
+                          obs - DataBasis_full$EnsembleMean, # compare relative to ensemble mean, as this is removed prior to emulation
                           Big_preds1$Expectation, 
                           Big_preds1$Variance, 
                           Error = Err, 
-                          Disc = 0*Err, 
+                          Disc = 0*Err, # discrepancy is zero, provides zero matrix with correct dimension
                           weightinv = Winv)
 Big_impl1$nroy # proportion of input space in NROY
 Big_impl1$bound # taken from chi-squared with ell = 512*7 degrees of freedom
+summary(Big_impl1$impl)
 
 # Visualising NROY
 library(GGally)
@@ -159,7 +160,7 @@ inNROY1 <- which(Val_impl1$inNROY)
 nroy_design <- val_design[inNROY1,]
 nroy_flows <- val_full[,inNROY1]
 
-set.seed(580) # a seed was not used during the 3 hour timeframe of the competition
+set.seed(581) # a seed was not used during the 3 hour timeframe of the competition
 w2_inds <- sample(1:nrow(nroy_design), n)
 
 train_full_w2 <- nroy_flows[,w2_inds]
@@ -189,7 +190,7 @@ Big_preds1_w2 <- BasisPredGasp(BigDesign, em_full_w2)
 
 # History match
 # The choice of 'observation error' is again arbitrary here as really it's zero
-Err_w2 <- 0.25*diag(512*7)
+Err_w2 <- 0.1*diag(512*7)
 Winv_w2 <- GetInverse(Err_w2)
 Big_impl1_w2 <- HistoryMatch(DataBasis_full_w2, 
                              obs - DataBasis_full_w2$EnsembleMean, 
@@ -199,29 +200,29 @@ Big_impl1_w2 <- HistoryMatch(DataBasis_full_w2,
                              Disc = 0*Err_w2, 
                              weightinv = Winv_w2)
 # Need points in NROY at both w1 and w2:
-sum(Big_impl1$inNROY & Big_impl1_w2$inNROY)
+#sum(Big_impl1$inNROY & Big_impl1_w2$inNROY) # actual amount in this space is arbitrary, because using arbitrary variance. Only care about smallest values for this application
 
 # Plot
-BigDesign$NROY2 <- Big_impl1$inNROY & Big_impl1_w2$inNROY
-p <- ggpairs(BigDesign[1:5000,], columns=k,
-             ggplot2::aes(color=NROY2) , upper = list(continuous = wrap("density", alpha = 0.5), combo = "box_no_facet"),
-             lower = list(continuous = wrap("points", alpha = 0.3), combo = wrap("dot_no_facet", alpha = 0.4)),
-             diag = list(continuous = wrap("densityDiag", alpha = 0.3)),
-             legend = 1) +
-  theme(legend.position = "bottom") + scale_colour_manual(values = c("#F8766D", "#00BFC4")) +
-  scale_fill_manual(values = c("#F8766D", "#00BFC4"))
-# Add truth
-for(i in 1:length(k)) {
-  p1 <- getPlot(p, i, i) + geom_vline(xintercept = as.numeric(truth_em[k[i]]))
-  p <- putPlot(p, p1, i, i)
-}
-p
+# BigDesign$NROY2 <- Big_impl1$inNROY & Big_impl1_w2$inNROY
+# p <- ggpairs(BigDesign[1:5000,], columns=k,
+#              ggplot2::aes(color=NROY2) , upper = list(continuous = wrap("density", alpha = 0.5), combo = "box_no_facet"),
+#              lower = list(continuous = wrap("points", alpha = 0.3), combo = wrap("dot_no_facet", alpha = 0.4)),
+#              diag = list(continuous = wrap("densityDiag", alpha = 0.3)),
+#              legend = 1) +
+#   theme(legend.position = "bottom") + scale_colour_manual(values = c("#F8766D", "#00BFC4")) +
+#   scale_fill_manual(values = c("#F8766D", "#00BFC4"))
+# # Add truth
+# for(i in 1:length(k)) {
+#   p1 <- getPlot(p, i, i) + geom_vline(xintercept = as.numeric(truth_em[k[i]]))
+#   p <- putPlot(p, p1, i, i)
+# }
+# p
 
-# Point in input space that minimises impl at w1, w2, vs truth
-BigDesign[which.min(Big_impl1$impl),]
-BigDesign[which.min(Big_impl1_w2$impl),]
+# Points in input space that minimise impl at w2, vs truth
+BigDesign[which.min(Big_impl1_w2$impl),] # and in fact input 76468 is the closest it is possible to get to the truth from the 100k samples in BigDesign
 order(Big_impl1_w2$impl)[1:10]
 Big_impl1$impl[order(Big_impl1_w2$impl)[1:10]] # these 'best' 10 all in W1 NROY as well
+BigDesign[order(Big_impl1_w2$impl)[1:10],]
 truth_em
 
 # Would usually now sample from NROY, do new simulations, refit emulators, etc. (as emulator uncertainty can likely still be reduced, so should be able to zoom in further)
@@ -258,6 +259,7 @@ summary(true_impl_w3)
 
 
 #### Wave 4 ####
+# Designed by some small perturbations around best point from wave 3, due to lack of time
 flow_W4 <- readRDS('data/systemic/flow_W4.rds')
 design_W4 <- readRDS('data/systemic/design_W4.rds')
 
