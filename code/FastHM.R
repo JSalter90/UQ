@@ -27,6 +27,7 @@ HistoryMatch <- function(DataBasis, Obs, Expectation, Variance, Error, Disc, wei
   if (is.null(weightinv)){
     weightinv <- GetInverse(W)
   }
+  nn <- dim(Expectation)[1]
   # Add uncertainty from discarded basis vectors?
   if (BasisUncertainty == TRUE){
     # These need to be projected in the same way that the emulated coefficients were
@@ -39,6 +40,24 @@ HistoryMatch <- function(DataBasis, Obs, Expectation, Variance, Error, Disc, wei
     W <- W + BasisVar
     weightinv <- GetInverse(W) # need to re-define W^-1 to include this extra variance, to enable fast calculation of full I(x)
   }
+  
+  # A faster implementation, if the full basis is still relatively small, and we are not considering a large number of points
+  # if (BasisUncertainty == TRUE){
+  #   # These need to be projected in the same way that the emulated coefficients were
+  #   BasMinusQ <- DataBasis$tBasis[,-(1:q)]
+  #   DeletedCoeffs <- Project(DataBasis$CentredField, BasMinusQ)
+  #   EstVar <- apply(DeletedCoeffs, 2, var) # vector of variances for deleted vectors
+  #   
+  #   # Re-define basis as full basis
+  #   Basis <- DataBasis$tBasis
+  #   
+  #   # Append columns of zeros to expectation to represent unemulated directions
+  #   Expectation <- cbind(Expectation, matrix(0, nn, ncol(Basis) - q))
+  #   
+  #   # Append columns with variance for each deleted direction
+  #   Variance <- cbind(Variance, matrix(rep(EstVar, each = nn), nn, ncol(Basis) - q))
+  # }
+
   R_W <- ReconError(Obs, Basis, weightinv = weightinv, scale = FALSE)
   # Project observations onto basis if required
   if (length(Obs) == l){
@@ -48,7 +67,6 @@ HistoryMatch <- function(DataBasis, Obs, Expectation, Variance, Error, Disc, wei
   if (dim(Disc)[1] == l){
     WProj <- VarProj(W, Basis, weightinv = weightinv)
   }
-  nn <- dim(Expectation)[1]
   impl <- as.numeric(mclapply(1:nn, function(i) ImplCoeff(Expectation[i,], Variance[i,], ObsProj, WProj, 0*WProj)))
   impl <- impl + rep(R_W, nn) 
   bound <- qchisq(0.995, l)
