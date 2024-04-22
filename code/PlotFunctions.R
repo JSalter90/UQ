@@ -372,16 +372,30 @@ Validate <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
     preds <- PredictGasp(design, emulator)
     upp <- max(c(preds$upper95, response))
     low <- min(c(preds$lower95, response))
-    errbar(preds$mean, preds$mean, preds$upper95, preds$lower95, cap = 0.015, pch=20, 
-           ylim=c(low,upp), main="",xlab = "Prediction",ylab="Data")
-    points(preds$mean, response, pch=19,
-           col = ifelse(response > preds$upper95 | response < preds$lower95, "red", "green"))
+    preds$truth <- response
+    
+    preds$In95 <- preds$truth >= preds$lower95 & preds$truth <= preds$upper95
+    perc_outside <- round(sum(preds$In95 == FALSE) / length(preds$In95) * 100, 1)
+    cols <- c('darkgrey', viridis(100)[31], viridis(100)[81])
+    
+    plots <- ggplot(as.data.frame(preds), aes(x = truth, y = mean, col = In95)) +
+      geom_errorbar(aes(ymin = lower95, ymax = upper95), col = cols[1]) +
+      geom_point() +
+      scale_colour_manual(values = c(cols[2:3])) +
+      geom_abline(slope = 1, alpha = 0.6) +
+      labs(y = 'Prediction', x = 'Truth', title = paste0('Outside 95% = ', perc_outside, '%')) +
+      theme(legend.position = 'none')
+
     if (IndivPars == TRUE){
-      for (i in 1:dim(design)[2]){
-        errbar(design[,i], preds$mean, preds$upper95, preds$lower95, cap = 0.015, pch=20, 
-               ylim=c(low,upp), xlab = "Input",ylab="Prediction", main = paste(colnames(design)[i]))
-        points(design[,i], response, pch=19,
-               col = ifelse(response > preds$upper95 | response < preds$lower95, "red", "green"))
+      plots_inputs <- NULL
+      for (j in 1:dim(design)[2]){
+        plot_data <- data.frame(x = design[,j], as.data.frame(preds))
+        plots_inputs[[j]] <- ggplot(plot_data, aes(x = x, y = mean, col = In95)) +
+          geom_errorbar(aes(ymin = lower95, ymax = upper95), col = cols[1]) +
+          geom_point() +
+          scale_colour_manual(values = c(cols[2:3])) +
+          labs(y = 'Prediction', x = paste0(colnames(design)[j])) +
+          theme(legend.position = 'none')
       }
     }
   }
