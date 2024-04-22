@@ -368,7 +368,10 @@ Project <- function(data, basis, weightinv = NULL){
     x <- backsolve(Q, t(basis) %*% weightinv %*% data, transpose = TRUE)
     scores <- crossprod(y, x)
   }
-  return(t(scores))
+  # Assign coefficient labels to columns
+  scores <- t(scores)
+  colnames(scores)[1:p] <- paste("C",1:p,sep="")
+  return(scores)
 }
 
 CalcScores <- Project
