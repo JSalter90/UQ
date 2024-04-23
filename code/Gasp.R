@@ -150,6 +150,11 @@ PredictGasp <- function(Design, emulator){
   }
   
   else if (emulator$mean_fn == 'linear'){
+    noise_ind <- colnames(Design) == 'Noise'
+    if (sum(noise_ind) > 0){
+      noise_ind <- which(colnames(Design) == 'Noise')
+      Design <- Design[,c(1:(noise_ind-1))]
+    }
     X <- cbind(rep(1,dim(Design)[1]), Design)
     preds <- predict(emulator$em, Design, testing_trend = as.matrix(X))
   }
