@@ -1,6 +1,10 @@
 # Some additional basis functionality, that will be combined with other source code at some point
 # Mostly plotting, but also sampling from emulator posteriors
 
+library(ggplot2)
+library(reshape2)
+library(cowplot)
+
 #' Takes mean/variance from set of basis emulators and samples reconstructed fields
 BasisEmSamples <- function(BasisPred, DataBasis, ns = 100, AddMean = TRUE, ReturnAll = TRUE, BasisUncertainty = TRUE, ...){
   n <- nrow(BasisPred$Expectation)
