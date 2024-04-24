@@ -228,7 +228,7 @@ PlotRecon <- function(DataBasis, q = 1, inds = 1:16, AddMean = TRUE, residual = 
   fields <- DataBasis$CentredField[,inds]
   basis <- DataBasis$tBasis[,1:q]
   k <- length(inds)
-  recons <- lapply(1:k, function(i) ReconObs(fields[,i], basis))
+  recons <- lapply(1:k, function(i) ReconField(fields[,i], basis))
   recons <- matrix(unlist(recons), ell) 
   
   if (is.null(input_values)){
