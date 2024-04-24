@@ -146,6 +146,11 @@ BuildGasp <- function(Response, tData, mean_fn = NULL, training_prop = 0.75, Fou
 #' @export
 PredictGasp <- function(Design, emulator){
   if (is.null(emulator$mean_fn)){
+    noise_ind <- colnames(Design) == 'Noise'
+    if (sum(noise_ind) > 0){
+      noise_ind <- which(colnames(Design) == 'Noise')
+      Design <- Design[,c(1:(noise_ind-1))]
+    }
     preds <- predict(emulator$em, Design)
   }
   
