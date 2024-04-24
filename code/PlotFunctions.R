@@ -221,6 +221,57 @@ PlotSamples <- function(Samples, inds = NULL, Truth = NULL, input_values = NULL,
 
 
 
+#' Projects and reconstructs runs
+PlotRecon <- function(DataBasis, q = 1, inds = 1:16, AddMean = TRUE, residual = FALSE, input_values = NULL, input_name = NULL, output_name = NULL, ...){
+  
+  ell <- nrow(DataBasis$tBasis)
+  fields <- DataBasis$CentredField[,inds]
+  basis <- DataBasis$tBasis[,1:q]
+  k <- length(inds)
+  recons <- lapply(1:k, function(i) ReconObs(fields[,i], basis))
+  recons <- matrix(unlist(recons), ell) 
+  
+  if (is.null(input_values)){
+    input_values <- 1:ell
+  }
+  
+  if (AddMean){
+    mu <- DataBasis$EnsembleMean
+  }
+  
+  else {
+    mu <- 0*DataBasis$EnsembleMean
+  }
+  
+  if (!(residual)){
+    plot_data <- data.frame(Input = input_values, 
+                            Output = c(recons) + mu,
+                            Truth = c(fields) + mu,
+                            Run = rep(inds, each = ell))
+    
+    plot <- ggplot(plot_data, aes(Input, Output)) + 
+      geom_line(col = 'red', size = 1) +
+      geom_line(aes(Input, Truth), col = 'black', size = 1) +
+      facet_wrap(vars(Run)) +
+      theme(legend.position = 'none') +
+      labs(x = input_name, y = output_name)
+  }
+  
+  if (residual){
+    plot_data <- data.frame(Input = input_values, 
+                            Residual = c(fields - recons),
+                            Run = rep(inds, each = ell))
+    
+    plot <- ggplot(plot_data, aes(Input, Residual)) + 
+      geom_line(col = 'red', size = 1) +
+      facet_wrap(vars(Run)) +
+      theme(legend.position = 'none') +
+      labs(x = input_name, y = output_name)
+  }
+
+  return(plot)
+}
+
 
 #' Plots a 1D representation of the 1st q basis vectors
 Plot1DBasis <- function(DataBasis, q = 9, input_values = NULL, input_name = NULL){
