@@ -7,7 +7,7 @@
 #' @param DataBasis object containing the basis used in emulation ($tBasis)
 #' @param Obs observation vector (length \ell), must be centred
 #' @param Expectation a matrix containing emulator expectations, where a given row contains the expectations for the q emulated basis vectors, for some x
-#' @param Variance a matrix containing emulatorvariances, where a given row contains the variances for the q emulated basis vectors, for some x
+#' @param Variance a matrix containing emulator variances, where a given row contains the variances for the q emulated basis vectors, for some x
 #' @param Error observation error variance matrix
 #' @param Disc discrepancy variance matrix
 #' @param weightinv if not NULL, the inverse of W = var_err + var_disc, used for projection
