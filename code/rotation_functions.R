@@ -160,57 +160,6 @@ ExplainT <- function(DataBasis, vtot = 0.95, weightinv = NULL){
 }
 
 
-
-#' Reconstruction error
-#'
-#' Calculates the reconstruction error, R_W(basis, obs), of the observations given a basis and W.
-#'
-#' @param obs The observations
-#' @param basis Basis to project and reconstruct the observations with
-#' @param weightinv Inverse of weight matrix W. If NULL (default), calculates the mean squared error
-#' @param scale If TRUE, scales by the dimension (so analogous to mean squared error)
-#'
-#' @return The reconstruction error
-#'
-#' @export
-ReconError <- function(obs, basis, weightinv = NULL, scale = TRUE){
-  if (is.null(weightinv)){
-    weightinv <- 0
-    attr(weightinv, 'diagonal') <- attr(weightinv, 'identity') <- TRUE
-  }
-  field <- ReconObs(obs, basis, weightinv)
-  A <- c(obs) - field
-  mask <- which(is.na(A))
-  if(length(mask)>0){
-    A <- A[-mask]
-  }
-  if (scale == TRUE){
-    s <- length(c(obs))-length(mask)
-  }
-  else {
-    s <- 1
-  }
-  if (attributes(weightinv)$diagonal == FALSE){
-    if(length(mask)>0){
-      warning("Implicit assumption that weight specified on the full field even though applying a mask to missing obs/ensemble grid boxes")
-      weightinv <- weightinv[-mask,-mask]
-    }
-    wmse <- (t(A) %*% weightinv %*% A)/ s
-  }
-  else {
-    if (attributes(weightinv)$identity == TRUE){
-      wmse <- crossprod(A)/ s
-    }
-    else {
-      wmse <- crossprod(A/(1/diag(weightinv)), A)/ s
-    }
-  }
-  return(wmse)
-}
-
-
-
-
 #### More flexibility in specification, e.g. v, time allowed, make prior clearer, remove months etc. ####
 #' Finding a calibration-optimal basis rotation
 #'
@@ -497,46 +446,7 @@ VarMSEplot <- function(DataBasis, obs, RecVarData = NULL, weightinv=NULL, min.li
 }
 
 
-errors <- function(basis, obs, weightinv=NULL){
-  p <- dim(basis)[2]
-  err <- numeric(p)
-  if (is.null(weightinv)){
-    weightinv <- diag(dim(basis)[1])
-    attr(weightinv, 'diagonal') <- attr(weightinv, 'identity') <- TRUE
-  }
-  for (i in 1:p){
-    err[i] <- ReconError(obs, basis[,1:i], weightinv)
-  }
-  return(err)
-}
 
-
-
-#' Matrix projection
-#'
-#' Projects a variance matrix onto a given basis
-#'
-#' @param mat A square matrix to be projected onto the basis
-#' @param basis The basis to project with
-#' @param weightinv The inverse of positive definite matrix W. If NULL, uses the standard projection, otherwise projects in the norm given by W.
-#'
-#' @return The projection of the original matrix on the basis.
-#'
-#' @export
-VarProj <- function(mat, basis, weightinv = NULL){
-  if (is.null(weightinv)){
-    proj <- t(basis) %*% mat %*% basis
-  }
-  else {
-    V <- t(basis) %*% weightinv %*% basis
-    Q <- chol(V)
-    y <- backsolve(Q, diag(dim(basis)[2]), transpose = TRUE)
-    x <- backsolve(Q, t(basis) %*% weightinv, transpose = TRUE)
-    comp <- crossprod(y, x)
-    proj <- comp %*% mat %*% t(comp)
-  }
-  return(proj)
-}
 
 #' Function used within optimiser for minimisation of the reconstruction error for rotated basis, subject to constraints
 #'
