@@ -22,29 +22,6 @@ ReconBasis <- function(weights, basis){
 }
 
 
-#### Rename ####
-#' Number of basis vectors required to explain proportion of data
-#'
-#' Finds the truncated basis that explains a set proportion of the variaiblity in the data.
-#'
-#' @param basis Basis matrix
-#' @param data Data matrix
-#' @param vtot The total proportion of variability in the data to be explained by the truncated basis
-#' @param weightinv The inverse of W
-#'
-#' @return The number of basis vectors required to explain vtot of the data.
-#'
-#' @export
-ExplainT <- function(DataBasis, vtot = 0.95, weightinv = NULL){
-  v <- 0
-  q <- 0
-  while (v < vtot & q < dim(DataBasis$tBasis)[2]){
-    v <- VarExplained(DataBasis$tBasis[,1:(q+1)], DataBasis$CentredField, weightinv)
-    q <- q + 1
-  }
-  return(q)
-}
-
 
 #### More flexibility in specification, e.g. v, time allowed, make prior clearer, remove months etc. ####
 #' Finding a calibration-optimal basis rotation
