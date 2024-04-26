@@ -1,4 +1,4 @@
-source('code/rotation_functions.R')
+source('code/basis.R')
 source('code/FastHM.R')
 
 # From ExeterUQ https://github.com/BayesExeter/ExeterUQ - edit path to read this
