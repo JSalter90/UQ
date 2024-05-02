@@ -58,6 +58,31 @@ MakeDataBasis <- function(data, weightinv = NULL, W = NULL, RemoveMean = TRUE, S
 }
 
 
+#' Combine input data with basis projections
+#' 
+#' Processes data into the correct form for emulation of q coefficients
+#' 
+#' @param Design n x p matrix of inputs. Usually should already be scaled, and in the same order as the fields in DataBasis
+#' @param DataBasis Object created by MakeDataBasis, containing basis, centred fields, and other information
+#' @param q The number of basis vectors to project onto
+#' @param Noise Whether to include a noise vector (sometimes used in selection of the GP mean function)
+#' 
+#' @return Inputs and outputs required for emulation
+#' 
+GetEmData <- function(Design, DataBasis, q = NULL, Noise = TRUE){
+  if(Noise){
+    Noise <- runif(length(Design[,1]),-1,1)
+    Design <- cbind(Design, Noise)
+  }
+  tData <- Project(DataBasis$CentredField, DataBasis$tBasis[,1:q], weightinv = DataBasis$Winv)
+  colnames(tData) <- paste0('C', 1:ncol(tData)) 
+  tData <- cbind(Design, tData)
+  return(tData)
+}
+
+GetEmulatableData <- GetEmData
+
+
 #' Weighted singular value decomposition
 #'
 #' Calculates the SVD basis across the output, given the inverse of W.

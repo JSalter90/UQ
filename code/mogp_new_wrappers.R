@@ -91,20 +91,6 @@ AssessBasis <- function(DataBasis, Obs){
 }
 
 
-# Use this to create tData, projected obs, etc.
-#### POSSIBLY RENAME ####
-GetEmulatableData <- function(Design, DataBasis, BasisSize = NULL, Obs, Noise = TRUE){
-  if(Noise){
-    Noise <- runif(length(Design[,1]),-1,1)
-    Design <- cbind(Design, Noise)
-  }
-  tData <- Project(DataBasis$CentredField, DataBasis$tBasis[,1:BasisSize], weightinv = DataBasis$Winv)
-  colnames(tData) <- paste0('C', 1:ncol(tData)) 
-  tData <- cbind(Design, tData)
-  return(tData)
-}
-
-
 MVImplausibilityMOGP <- function(NewData, Emulator, DataBasis, Discrepancy, Obs, ObsErr){
   tEmulator <- Emulator$mogp$predict(as.matrix(NewData), deriv=FALSE)
   
