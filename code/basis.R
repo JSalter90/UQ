@@ -58,6 +58,9 @@ MakeDataBasis <- function(data, weightinv = NULL, W = NULL, RemoveMean = TRUE, S
 }
 
 
+
+
+
 #' Combine input data with basis projections
 #' 
 #' Processes data into the correct form for emulation of q coefficients
@@ -497,7 +500,98 @@ ExplainT <- function(DataBasis, vtot = 0.95, weightinv = NULL){
 
 
 
+#' This mostly does the same as MakeDataBasis, likely remove once added any additional functionality to MakeDataBasis
+# Create basis (DataBasis object) and other preliminary calculations (inverting W)
+# CreateBasis <- function(data, type = 'SVD', W = NULL, RemoveMean = TRUE){
+#   # Invert W, creating Winv and tagging with attributes to enable fast calculations later on
+#   if (is.null(W)){
+#     W <- diag(nrow(data))
+#   }
+#   
+#   Winv <- GetInverse(W)
+#   
+#   if (type %in% c('SVD', 'svd', 'L2')){
+#     DataBasis <- MakeDataBasis(data, weightinv = NULL, RemoveMean = RemoveMean, StoreEigen = TRUE)
+#   }
+#   
+#   if (type %in% c('WSVD', 'wsvd', 'wSVD')){
+#     DataBasis <- MakeDataBasis(data, weightinv = Winv, RemoveMean = RemoveMean, StoreEigen = TRUE)
+#   }
+#   
+#   DataBasis$Type <- type
+#   
+#   if (DataBasis$Type %in% c('svd', 'L2')){
+#     DataBasis$Type <- 'SVD'
+#   }
+#   
+#   if (DataBasis$Type %in% c('WSVD', 'wsvd')){
+#     DataBasis$Type <- 'wSVD'
+#   }
+#   
+#   return(DataBasis)
+# }
 
+
+
+
+#' Combines some other functions, review to see whether adds anything unique
+# AssessBasis <- function(DataBasis, Obs){
+#   
+#   max_q <- dim(DataBasis$tBasis)[2]
+#   PlotData <- data.frame(Size = 1:max_q, Error = numeric(max_q), Explained = numeric(max_q))
+#   
+#   if (!is.null(DataBasis$scaling)){
+#     PlotData$Error <- errors(DataBasis$tBasis, Obs - DataBasis$EnsembleMean, DataBasis$Winv)*DataBasis$scaling^2
+#   }
+#   else {
+#     PlotData$Error <- errors(DataBasis$tBasis, Obs - DataBasis$EnsembleMean, DataBasis$Winv)
+#   }
+#   
+#   if (is.null(DataBasis$Winv)){
+#     var_sum <- crossprod(c(DataBasis$CentredField))
+#   }
+#   else {
+#     var_sum <- sum(diag(t(DataBasis$CentredField) %*% DataBasis$Winv %*% DataBasis$CentredField))
+#   }
+#   
+#   for (i in 1:max_q){
+#     PlotData$Explained[i] <- VarExplained(DataBasis$tBasis[,1:i], DataBasis$CentredField, DataBasis$Winv, total_sum = var_sum)
+#   }
+#   
+#   PlotData$Explained <- round(PlotData$Explained, 10) # to make sure plots when = 1
+#   
+#   chi_bound <- qchisq(0.995, nrow(DataBasis$tBasis)) / nrow(DataBasis$tBasis)
+#   max_y <- max(c(PlotData$Error, chi_bound + 0.05))
+#   
+#   var_plot <- ggplot(data = PlotData, aes(x = Size)) +
+#     geom_line(aes(y = Error), col = 'red') +
+#     geom_line(aes(y = Explained * max_y), col = 'blue') +
+#     xlab('Basis size') +
+#     scale_y_continuous(
+#       #name = 'Error',
+#       limits = c(0,max_y),
+#       #breaks = seq(from = 0, to = 1*max_y, by = 0.25*max_y),
+#       #labels = NULL,
+#       sec.axis = sec_axis(trans=~./max_y, name="Explained")) +
+#     #geom_vline(xintercept = q) +
+#     geom_hline(yintercept = chi_bound, linetype = 'dashed', col = 'red') +
+#     geom_hline(yintercept = 0.9*max_y, linetype = 'dashed', col = 'blue')
+#   #theme(panel.grid.major = element_blank(), 
+#   #      panel.grid.minor = element_blank())
+#   
+#   # Then don't need to do ExplainT, as already have the error/explained combinations
+#   # Give list of (threshold, q)
+#   thresholds <- c(0.8, 0.85, 0.9, 0.95, 0.99, 0.999)
+#   q <- numeric(length(thresholds))
+#   for (j in 1:length(q)){
+#     q[j] <- which(PlotData$Explained >= thresholds[j])[1]
+#   }
+#   
+#   return(list(plot = var_plot,
+#               Errors = PlotData,
+#               Truncations = data.frame(Threshold = thresholds,
+#                                        q = q)))
+# }
 
 
 
