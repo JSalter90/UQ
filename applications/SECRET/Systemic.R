@@ -18,6 +18,7 @@ library(reshape2)
 # Also reads a file from https://github.com/BayesExeter/ExeterUQ, edit paths in Gasp.R to reflect location of this
 setwd('~/Dropbox/UQ/') # edit directory on local machine to where https://github.com/JSalter90/UQ is cloned
 source('code/Gasp.R')
+source('code/PlotFunctions.R')
 
 # Load inputs
 setwd('~/Dropbox/UQ/applications/SECRET')
