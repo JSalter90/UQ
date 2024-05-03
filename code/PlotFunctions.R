@@ -410,7 +410,33 @@ LeaveOneOut <- function(emulator){
 }
 
 
-#' Prediction over validation set in ggplot
+# Old version in base R plot
+# LeaveOneOut <- function(emulator){
+#   require(sfsmisc)
+#   em <- emulator$em
+#   loo_preds <- leave_one_out_rgasp(em)
+#   loo_preds$lower95 <- loo_preds$mean - 1.96*loo_preds$sd
+#   loo_preds$upper95 <- loo_preds$mean + 1.96*loo_preds$sd
+#   response <- emulator$train_data[,dim(emulator$train_data)[2]]
+#   upp <- max(c(loo_preds$upper95, response))
+#   low <- min(c(loo_preds$lower95, response))
+#   errbar(loo_preds$mean, loo_preds$mean, loo_preds$upper95, loo_preds$lower95, cap = 0.015, pch=20, 
+#          ylim=c(low,upp),xlab = "Prediction",ylab="Data", main = 'Leave-one-out')
+#   points(loo_preds$mean, response, pch=19,
+#          col = ifelse(response > loo_preds$upper95 | response < loo_preds$lower95, "red", "green"))
+# }
+
+
+
+
+#' Validating a GaSP emulator
+#' 
+#' Given a validation dataset, predicts and plots the mean and 95% uncertainty interval against the true output
+#' 
+#'  @param emulator either a single output from BuildGasp, or a list of emulators
+#'  @param ValidationData a validation data frame containing inputs and true output. If NULL, validation is performed using the validation_data output of the emulator
+#'  
+#'  @export
 Validate <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
   q <- length(emulator$em) # 1 if a single output from BuildGasp, 0 if a list of emulators
   if (q == 1){
@@ -512,7 +538,69 @@ Validate <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
   }
 }
 
+ValidateGasp <- Validate
 
+#' Old version in base R
+# ValidateGasp <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
+#   require(sfsmisc)
+#   q <- length(emulator$em) # 1 if a single output from BuildGasp, 0 if a list of emulators
+#   if (q == 1){
+#     if (!is.null(ValidationData)){
+#       emulator$validation_data <- ValidationData[,colnames(emulator$train_data)]
+#     }
+#     resp_ind <- dim(emulator$validation_data)[2]
+#     design <- emulator$validation_data[,-resp_ind]
+#     if (length(emulator$active) == 1){
+#       design <- as.matrix(design, ncol = 1)
+#       colnames(design) <- emulator$active
+#     }
+#     response <- emulator$validation_data[,resp_ind]
+#     preds <- PredictGasp(design, emulator)
+#     upp <- max(c(preds$upper95, response))
+#     low <- min(c(preds$lower95, response))
+#     errbar(preds$mean, preds$mean, preds$upper95, preds$lower95, cap = 0.015, pch=20, 
+#            ylim=c(low,upp), main="",xlab = "Prediction",ylab="Data")
+#     points(preds$mean, response, pch=19,
+#            col = ifelse(response > preds$upper95 | response < preds$lower95, "red", "green"))
+#     if (IndivPars == TRUE){
+#       for (i in 1:dim(design)[2]){
+#         errbar(design[,i], preds$mean, preds$upper95, preds$lower95, cap = 0.015, pch=20, 
+#                ylim=c(low,upp), xlab = "Input",ylab="Prediction", main = paste(colnames(design)[i]))
+#         points(design[,i], response, pch=19,
+#                col = ifelse(response > preds$upper95 | response < preds$lower95, "red", "green"))
+#       }
+#     }
+#   }
+#   else {
+#     for (i in 1:length(emulator)){
+#       if (!is.null(ValidationData)){
+#         emulator[[i]]$validation_data <- ValidationData[,colnames(emulator[[i]]$train_data)]
+#       }
+#       resp_ind <- dim(emulator[[i]]$validation_data)[2]
+#       design <- emulator[[i]]$validation_data[,-resp_ind]
+#       if (length(emulator[[i]]$active) == 1){
+#         design <- as.matrix(design, ncol = 1)
+#         colnames(design) <- emulator[[i]]$active
+#       }
+#       response <- emulator[[i]]$validation_data[,resp_ind]
+#       preds <- PredictGasp(design, emulator[[i]])
+#       upp <- max(c(preds$upper95, response))
+#       low <- min(c(preds$lower95, response))
+#       errbar(preds$mean, preds$mean, preds$upper95, preds$lower95, cap = 0.015, pch=20, 
+#              ylim=c(low,upp),xlab = "Prediction",ylab="Data", main = colnames(emulator[[i]]$validation_data)[resp_ind])
+#       points(preds$mean, response, pch=19,
+#              col = ifelse(response > preds$upper95 | response < preds$lower95, "red", "green"))
+#       if (IndivPars == TRUE){
+#         for (j in 1:dim(design)[2]){
+#           errbar(design[,j], preds$mean, preds$upper95, preds$lower95, cap = 0.015, pch=20, 
+#                  ylim=c(low,upp),xlab = "Input",ylab="Prediction", main = paste(colnames(design)[j]))
+#           points(design[,j], response, pch=19,
+#                  col = ifelse(response > preds$upper95 | response < preds$lower95, "red", "green"))
+#         }
+#       }
+#     }
+#   }
+# }
 
 
 
