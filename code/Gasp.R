@@ -384,38 +384,6 @@ PredictAndHM_multi <- function(DataBasis, Obs, Ems, tData, ns = 1000, Error, Dis
 
 
 
-
-#' Create tData
-#' 
-#' Projects data onto a basis, and creates the tData object used in emulation
-#' 
-#' @param Design data frame containing the input parameters
-#' @param EnsembleData object containing CentredField and tBasis, with the centred data projected onto the basis
-#' @param HowManyBasisVectors number of basis vectors to project onto
-#' @param Noise whether to add a vector of noise, used in stepwise selection of mean functions
-#' @param weightinv matrix to use for projection. If NULL, L2 projection is used
-#' 
-#' @return A tData data frame
-#' 
-#' @export
-GetEmulatableDataWeighted <- function(Design, EnsembleData, HowManyBasisVectors, Noise=TRUE, weightinv = NULL){
-  if(Noise){
-    Noise <- runif(length(Design[,1]),-1,1)
-    Design <- cbind(Design, Noise)
-  }
-  #tcoefs <- StandardCoefficients(EnsembleData$CentredField, EnsembleData$tBasis[,1:HowManyBasisVectors], orthogonal=FALSE)
-  coeffs <- CalcScores(data = EnsembleData$CentredField, basis = EnsembleData$tBasis[,1:HowManyBasisVectors], weightinv = weightinv)
-  tData <- cbind(Design, coeffs)
-  ln <- length(names(tData))
-  names(tData)[(ln-HowManyBasisVectors+1):ln] <- paste("C",1:HowManyBasisVectors,sep="")
-  tData
-}
-
-
-
-
-
-
 #' Include NROY points from previous waves
 #' 
 #' At wave k > 1, add any points from previous waves that are in the current NROY space, and define the new DataBasis object and centred observations by adding these to the new ensemble
