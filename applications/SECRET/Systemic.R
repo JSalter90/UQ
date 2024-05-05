@@ -10,7 +10,7 @@
 # We've reproduced the exact same results up to end of wave 2
 
 # See Example_EmulateTS.html for more detail on the emulation approach, applied to a single time series (generalises to other high dimensional output, e.g., stacking together multiple series as here)
-
+# Systemic_summary.html gives an overview of some results
 library(R.matlab)
 library(reshape2)
 

@@ -1,22 +1,21 @@
 # SECRET competition, September 2023
 # Code for pulmonary model, Exeter team
-
 # See Example_EmulateTS.html for more detail on the emulation approach, applied to a single time series (generalises to other high dimensional output, e.g., stacking together multiple series as here)
-
+# Pulmonary_summary.html gives an overview of some results
 library(R.matlab)
 library(reshape2)
 library(ggplot2)
-
-# consistent colour palette for w1-w3
-cols <- c('darkblue', viridis(100)[c(50,95)])
-obs_col <- 'green'
-truth_col <- 'turquoise'
 
 # Basis emulation functions are found at https://github.com/JSalter90/UQ
 # Also reads a file from https://github.com/BayesExeter/ExeterUQ, edit paths in Gasp.R to reflect location of this
 setwd('~/Dropbox/UQ/') # edit directory on local machine to where https://github.com/JSalter90/UQ is cloned
 source('code/Gasp.R')
 source('code/PlotFunctions.R')
+
+# Consistent colour palette for w1-w3
+cols <- c('darkblue', viridis(100)[c(50,95)])
+obs_col <- 'green'
+truth_col <- 'turquoise'
 
 # Load inputs
 setwd('~/Dropbox/UQ/applications/SECRET')
@@ -58,17 +57,17 @@ true_obs <- readRDS('data/pulmonary/true_obs.rds')
 # Calculate basis, project
 DataBasis_flow1 <- MakeDataBasis(outputW1[,1,])
 q1 <- ExplainT(DataBasis_flow1, vtot = 0.95)
-Coeffs_flow1 <- CalcScores(data = DataBasis_flow1$CentredField, basis = DataBasis_flow1$tBasis[,1:q1])
+Coeffs_flow1 <- Project(data = DataBasis_flow1$CentredField, basis = DataBasis_flow1$tBasis[,1:q1])
 tData_flow1 <- data.frame(designW1_em[,1:4], Noise = runif(100), Coeffs_flow1)
 
 DataBasis_flow2 <- MakeDataBasis(outputW1[,2,])
 q2 <- ExplainT(DataBasis_flow2, vtot = 0.95)
-Coeffs_flow2 <- CalcScores(data = DataBasis_flow2$CentredField, basis = DataBasis_flow2$tBasis[,1:q2])
+Coeffs_flow2 <- Project(data = DataBasis_flow2$CentredField, basis = DataBasis_flow2$tBasis[,1:q2])
 tData_flow2 <- data.frame(designW1_em[,1:4], Noise = runif(100), Coeffs_flow2)
 
 DataBasis_pressure <- MakeDataBasis(outputW1[,3,])
 q3 <- ExplainT(DataBasis_pressure, vtot = 0.999) # different choice, as only need 3 vectors to explain 99.9% here
-Coeffs_pressure <- CalcScores(data = DataBasis_pressure$CentredField, basis = DataBasis_pressure$tBasis[,1:q3])
+Coeffs_pressure <- Project(data = DataBasis_pressure$CentredField, basis = DataBasis_pressure$tBasis[,1:q3])
 tData_pressure <- data.frame(designW1_em[,1:4], Noise = runif(100), Coeffs_pressure)
 
 # Emulate
@@ -250,17 +249,17 @@ ggplot(all_waves, aes(x = Time, y = value, linetype = as.factor(Run), col = as.f
 # Add in all of wave 1 - didn't definitively rule out any x, so still trying to emulate everything accurately
 DataBasis_flow1_w2 <- MakeDataBasis(cbind(outputW1[,1,], outputW2[,1,]))
 q1_w2 <- ExplainT(DataBasis_flow1_w2, vtot = 0.99)
-Coeffs_flow1_w2 <- CalcScores(data = DataBasis_flow1_w2$CentredField, basis = DataBasis_flow1_w2$tBasis[,1:q1_w2])
+Coeffs_flow1_w2 <- Project(data = DataBasis_flow1_w2$CentredField, basis = DataBasis_flow1_w2$tBasis[,1:q1_w2])
 tData_flow1_w2 <- data.frame(rbind(designW1_em[,1:4], designW2_em[,1:4]), Noise = runif(200), Coeffs_flow1_w2)
 
 DataBasis_flow2_w2 <- MakeDataBasis(cbind(outputW1[,2,], outputW2[,2,]))
 q2_w2 <- ExplainT(DataBasis_flow2_w2, vtot = 0.99)
-Coeffs_flow2_w2 <- CalcScores(data = DataBasis_flow2_w2$CentredField, basis = DataBasis_flow2_w2$tBasis[,1:q2_w2])
+Coeffs_flow2_w2 <- Project(data = DataBasis_flow2_w2$CentredField, basis = DataBasis_flow2_w2$tBasis[,1:q2_w2])
 tData_flow2_w2 <- data.frame(rbind(designW1_em[,1:4], designW2_em[,1:4]), Noise = runif(200), Coeffs_flow2_w2)
 
 DataBasis_pressure_w2 <- MakeDataBasis(cbind(outputW1[,3,], outputW2[,3,]))
 q3_w2 <- ExplainT(DataBasis_pressure_w2, vtot = 0.999)
-Coeffs_pressure_w2 <- CalcScores(data = DataBasis_pressure_w2$CentredField, basis = DataBasis_pressure_w2$tBasis[,1:q3_w2])
+Coeffs_pressure_w2 <- Project(data = DataBasis_pressure_w2$CentredField, basis = DataBasis_pressure_w2$tBasis[,1:q3_w2])
 tData_pressure_w2 <- data.frame(rbind(designW1_em[,1:4], designW2_em[,1:4]), Noise = runif(200), Coeffs_pressure_w2)
 
 em_flow1_w2 <- BasisEmulators(tData_flow1_w2, q1_w2, mean_fn = 'step', maxdf = NULL, training_prop = 1)
@@ -346,17 +345,17 @@ ggplot(all_waves, aes(x = Time, y = value, linetype = as.factor(Run), col = as.f
 # Refit basis, emulators. Again append new data as haven't relly ruled out any x
 DataBasis_flow1_w3 <- MakeDataBasis(cbind(outputW1[,1,], outputW2[,1,], outputW3[,1,]))
 q1_w3 <- ExplainT(DataBasis_flow1_w3, vtot = 0.99)
-Coeffs_flow1_w3 <- CalcScores(data = DataBasis_flow1_w3$CentredField, basis = DataBasis_flow1_w3$tBasis[,1:q1_w3])
+Coeffs_flow1_w3 <- Project(data = DataBasis_flow1_w3$CentredField, basis = DataBasis_flow1_w3$tBasis[,1:q1_w3])
 tData_flow1_w3 <- data.frame(rbind(designW1_em[,1:4], designW2_em[,1:4], designW3_em[,1:4]), Noise = runif(300), Coeffs_flow1_w3)
 
 DataBasis_flow2_w3 <- MakeDataBasis(cbind(outputW1[,2,], outputW2[,2,], outputW3[,2,]))
 q2_w3 <- ExplainT(DataBasis_flow2_w3, vtot = 0.99)
-Coeffs_flow2_w3 <- CalcScores(data = DataBasis_flow2_w3$CentredField, basis = DataBasis_flow2_w3$tBasis[,1:q2_w3])
+Coeffs_flow2_w3 <- Project(data = DataBasis_flow2_w3$CentredField, basis = DataBasis_flow2_w3$tBasis[,1:q2_w3])
 tData_flow2_w3 <- data.frame(rbind(designW1_em[,1:4], designW2_em[,1:4], designW3_em[,1:4]), Noise = runif(300), Coeffs_flow2_w3)
 
 DataBasis_pressure_w3 <- MakeDataBasis(cbind(outputW1[,3,], outputW2[,3,], outputW3[,3,]))
 q3_w3 <- ExplainT(DataBasis_pressure_w3, vtot = 0.999)
-Coeffs_pressure_w3 <- CalcScores(data = DataBasis_pressure_w3$CentredField, basis = DataBasis_pressure_w3$tBasis[,1:q3_w3])
+Coeffs_pressure_w3 <- Project(data = DataBasis_pressure_w3$CentredField, basis = DataBasis_pressure_w3$tBasis[,1:q3_w3])
 tData_pressure_w3 <- data.frame(rbind(designW1_em[,1:4], designW2_em[,1:4], designW3_em[,1:4]), Noise = runif(300), Coeffs_pressure_w3)
 
 em_flow1_w3 <- BasisEmulators(tData_flow1_w3, q1_w3, mean_fn = 'step', maxdf = NULL, training_prop = 1)
@@ -402,9 +401,6 @@ apply(impl_pressure_w3 < qchisq(0.995, 512), 2, sum)
 # So sample from emulators, calculate likelihood
 # Not really HM anymore, but choice of l informed by this
 
-
-
-
-
-
-
+# Submitted 500 runs
+submitted <- read.csv('data/pulmonary/submitted.csv')
+# See Pulmonary_summaary.html for plots
