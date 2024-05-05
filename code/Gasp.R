@@ -2,10 +2,10 @@ source('code/basis.R')
 source('code/FastHM.R')
 
 # From ExeterUQ https://github.com/BayesExeter/ExeterUQ - edit path to read this
-twd <- getwd()
+current_wd <- getwd()
 setwd('~/Dropbox/ExeterUQ')
 source('BuildEmulator/BuildEmulator.R')
-setwd(twd)
+setwd(current_wd)
 
 library(RobustGaSP)
 
