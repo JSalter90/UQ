@@ -398,6 +398,11 @@ LeaveOneOut <- function(emulator){
   perc_outside <- round(sum(loo_preds$In95 == FALSE) / length(loo_preds$In95) * 100, 1)
   cols <- c('darkgrey', viridis(100)[31], viridis(100)[81])
   
+  # Ensuring good points still coloured green if no points outside
+  if (perc_outside == 0){
+    cols[2:3] <- viridis(100)[81]
+  }
+  
   plot <- ggplot(as.data.frame(loo_preds), aes(x = truth, y = mean, col = In95)) +
     geom_errorbar(aes(ymin = lower95, ymax = upper95), col = cols[1]) +
     geom_point() +
