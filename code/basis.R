@@ -83,7 +83,7 @@ GetEmData <- function(Design, DataBasis, q = NULL, Noise = TRUE, weightinv = NUL
   }
   tData <- Project(DataBasis$CentredField, DataBasis$tBasis[,1:q], weightinv = weightinv)
   colnames(tData) <- paste0('C', 1:ncol(tData)) 
-  tData <- cbind(Design, tData)
+  tData <- data.frame(Design, tData)
   return(tData)
 }
 
