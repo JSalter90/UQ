@@ -296,6 +296,45 @@ Plot1DBasis <- function(DataBasis, q = 9, input_values = NULL, input_name = NULL
   return(plot)
 }
 
+
+#' Plots ensemble of 1D profile/TS
+Plot1DData <- function(DataBasis, AddMean = TRUE, inds = NULL, input_values = NULL, input_name = NULL){
+  ell <- nrow(DataBasis$tBasis)
+  n <- ncol(DataBasis$CentredField)
+  
+  if (is.null(input_values)){
+    input_values <- 1:ell
+  }
+  if (is.null(input_name)){
+    input_name <- 'Input'
+  }
+  
+  if (is.null(inds)){
+    inds <- 1:n
+  }
+  
+  if (AddMean){
+    mu <- DataBasis$EnsembleMean
+  }
+  
+  else {
+    mu <- rep(0, ell)
+  }
+  
+  plot_data <- data.frame(Values = input_values,
+                          Output = c(DataBasis$CentredField[,inds] + mu),
+                          Run = rep(inds, each = ell))
+  
+  plot <- ggplot(plot_data, aes(x = Values, y = Output, col = as.factor(Run))) +
+    geom_line() +
+    labs(x = input_name) +
+    theme(legend.position = 'none')
+  
+  return(plot)
+}
+
+
+
 #' Plots proportion of variance cumulatively, or individually, explained by each basis vector
 PlotExplained <- function(DataBasis, type = 'cumulative', ...){
   n <- ncol(DataBasis$tBasis)
