@@ -20,7 +20,7 @@ library(RobustGaSP)
 #' @param Fouriers if fitting a mean function via step, should Fourier terms be considered?
 #' @param linModel defaults to NULL. If not, gives an object of type 'lm' to be used as the mean function
 #' @param nugget should a nugget be estimated? Defaults to TRUE
-#' @param maxdf maximum number of terms allowed in the mean functiuon, if step used. Defaults to 0.1*size of training data
+#' @param maxdf maximum number of terms allowed in the mean function, if step used. Defaults to 0.1*size of training data
 #' 
 #' @return \item{em}{An rgasp emulator}
 #' \item{em_lm}{If mean_fn = 'step', the regression model that was fitted}
