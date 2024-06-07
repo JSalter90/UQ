@@ -16,7 +16,7 @@ Code for different emulation/calibration work
  
   * `application/SECRET` pulmonary and systemic model emulation
  
-  * `application/SECRET/Example-EmulateTS.html` A worked example of emulating high-dimensional output
+  * `application/SECRET/Example_EmulateTS.html` A worked example of emulating high-dimensional output
 
 See also:
 
