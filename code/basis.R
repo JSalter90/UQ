@@ -502,6 +502,18 @@ ExplainT <- function(DataBasis, vtot = 0.95, weightinv = NULL){
 
 
 #' Takes mean/variance from set of basis emulators and samples reconstructed fields
+#'
+#' @param BasisPred 
+#' @param DataBasis 
+#' @param ns 
+#' @param AddMean 
+#' @param ReturnAll 
+#' @param BasisUncertainty 
+#' @param ... 
+#' 
+#' @return 
+#' 
+#' @export
 BasisEmSamples <- function(BasisPred, DataBasis, ns = 100, AddMean = TRUE, ReturnAll = TRUE, BasisUncertainty = TRUE, ...){
   n <- nrow(BasisPred$Expectation)
   q <- ncol(BasisPred$Expectation)
@@ -543,26 +555,19 @@ BasisEmSamples <- function(BasisPred, DataBasis, ns = 100, AddMean = TRUE, Retur
   }
   
   if (n == 1){
-    em_samp <- matrix(0, ell, ns)
-    for (s in 1:ns){
-      samp <- rnorm(q, 
-                    mean = BasisPred$Expectation,
-                    sd = sqrt(BasisPred$Variance))
-      rec <- mu + Recon(samp, Basis)
-      em_samp[,s] <- rec
-    }
+    samp <- matrix(rnorm(q*ns,
+                         mean = rep(BasisPred$Expectation),
+                         sd = rep(sqrt(BasisPred$Variance))), nrow = ns, byrow = TRUE)
+    em_samp <- mu + Basis %*% t(samp)
   }
   
   if (n > 1){
     em_samp <- array(0, dim = c(ell, ns, n))
     for (i in 1:n){
-      for (s in 1:ns){
-        samp <- rnorm(q, 
-                      mean = BasisPred$Expectation[i,],
-                      sd = sqrt(BasisPred$Variance[i,]))
-        rec <- mu + Recon(samp, Basis)
-        em_samp[,s,i] <- rec
-      }
+      samp <- matrix(rnorm(q*ns,
+                           mean = rep(BasisPred$Expectation[i,]),
+                           sd = rep(sqrt(BasisPred$Variance[i,]))), nrow = ns, byrow = TRUE)
+      em_samp[,,i] <- mu + Basis %*% t(samp)
     }
   }
   
