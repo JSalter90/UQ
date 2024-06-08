@@ -3,9 +3,24 @@
 
 library(ggplot2)
 library(reshape2)
-library(cowplot)
 
+# Colours used in several validation functions
+my.cols <- c('darkgrey', viridis(100)[31], viridis(100)[81])
+
+#' Plotting emulator samples
+#'
 #' Takes samples (or a summary of these) from BasisEmSamples and plots, adds the truth if this is provided
+#'
+#' @param Samples 
+#' @param inds 
+#' @param Truth 
+#' @param input_values 
+#' @param input_name 
+#' @param output_name 
+#' 
+#' @return 
+#' 
+#' @export
 PlotSamples <- function(Samples, inds = NULL, Truth = NULL, input_values = NULL, input_name = NULL, output_name = NULL){
   
   if (is.null(input_name)){
@@ -132,6 +147,20 @@ PlotSamples <- function(Samples, inds = NULL, Truth = NULL, input_values = NULL,
 
 
 #' Projects and reconstructs runs
+#'
+#' @param DataBasis 
+#' @param q 
+#' @param inds 
+#' @param AddMean 
+#' @param residual 
+#' @param input_values 
+#' @param input_name 
+#' @param output_name 
+#' @param ... 
+#' 
+#' @return
+#' 
+#' @export
 PlotRecon <- function(DataBasis, q = 1, inds = 1:16, AddMean = TRUE, residual = FALSE, input_values = NULL, input_name = NULL, output_name = NULL, ...){
   
   ell <- nrow(DataBasis$tBasis)
@@ -184,6 +213,15 @@ PlotRecon <- function(DataBasis, q = 1, inds = 1:16, AddMean = TRUE, residual = 
 
 
 #' Plots a 1D representation of the 1st q basis vectors
+#'
+#' @param DataBasis 
+#' @param q 
+#' @param input_values 
+#' @param input_name 
+#' 
+#' @return 
+#' 
+#' @export
 Plot1DBasis <- function(DataBasis, q = 9, input_values = NULL, input_name = NULL){
   ell <- nrow(DataBasis$tBasis)
   if (is.null(input_values)){
@@ -208,6 +246,16 @@ Plot1DBasis <- function(DataBasis, q = 9, input_values = NULL, input_name = NULL
 
 
 #' Plots ensemble of 1D profile/TS
+#'
+#' @param DataBasis 
+#' @param AddMean 
+#' @param inds 
+#' @param input_values 
+#' @param input_name 
+#' 
+#' @return
+#' 
+#' @export
 Plot1DData <- function(DataBasis, AddMean = TRUE, inds = NULL, input_values = NULL, input_name = NULL){
   ell <- nrow(DataBasis$tBasis)
   n <- ncol(DataBasis$CentredField)
@@ -246,6 +294,14 @@ Plot1DData <- function(DataBasis, AddMean = TRUE, inds = NULL, input_values = NU
 
 
 #' Plots proportion of variance cumulatively, or individually, explained by each basis vector
+#'
+#' @param DataBasis 
+#' @param type 
+#' @param ... 
+#' 
+#' @return 
+#' 
+#' @export
 PlotExplained <- function(DataBasis, type = 'cumulative', ...){
   n <- ncol(DataBasis$tBasis)
   vars <- lapply(1:n, function(k) VarExplained(DataBasis$tBasis[,1:k], DataBasis$CentredField, ...))
@@ -266,6 +322,15 @@ PlotExplained <- function(DataBasis, type = 'cumulative', ...){
 
 
 #' Plots reconstruction error for each basis truncation
+#'
+#' @param DataBasis 
+#' @param obs 
+#' @param qmax 
+#' @param ... 
+#' 
+#' @return 
+#' 
+#' @export
 PlotReconError <- function(DataBasis, obs, qmax = NULL, ...){
   n <- ncol(DataBasis$tBasis)
   if (is.null(qmax)){
@@ -283,7 +348,18 @@ PlotReconError <- function(DataBasis, obs, qmax = NULL, ...){
 
 
 #' Plot pairs of coefficients and/or inputs, potentially coloured by a 3rd variable
+#' 
 #' Takes either output of `Project`, or something like tData (containing inputs and coefficients)
+#'
+#' @param coeffs 
+#' @param x 
+#' @param y 
+#' @param col 
+#' @param obs 
+#' 
+#' @return 
+#' 
+#' @export
 PlotPair <- function(coeffs, x = 'C1', y = 'C2', col = NULL, obs = NULL){
   coeffs <- as.data.frame(coeffs)
   plot_data <- data.frame(x = coeffs[,x],
@@ -312,6 +388,13 @@ PlotPair <- function(coeffs, x = 'C1', y = 'C2', col = NULL, obs = NULL){
 
 
 #' Visualise active variables across set of emulators
+#'
+#' @param Ems 
+#' @param InputNames 
+#' 
+#' @return 
+#' 
+#' @export
 PlotActive <- function(Ems, InputNames){
   q <- length(Ems) # number of emulators
   plot_data <- NULL
@@ -333,6 +416,11 @@ PlotActive <- function(Ems, InputNames){
 
 #' Leave-one-out plotting in ggplot
 #' 
+#' @param emulator 
+#' 
+#' @return 
+#' 
+#' @export
 LeaveOneOut <- function(emulator){
   em <- emulator$em
   loo_preds <- leave_one_out_rgasp(em)
@@ -345,8 +433,8 @@ LeaveOneOut <- function(emulator){
   
   loo_preds$In95 <- loo_preds$truth >= loo_preds$lower95 & loo_preds$truth <= loo_preds$upper95
   perc_outside <- round(sum(loo_preds$In95 == FALSE) / length(loo_preds$In95) * 100, 1)
-  cols <- c('darkgrey', viridis(100)[31], viridis(100)[81])
-  
+
+  cols <- my.cols
   # Ensuring good points still coloured green if no points outside
   if (perc_outside == 0){
     cols[2:3] <- viridis(100)[81]
@@ -387,10 +475,13 @@ LeaveOneOut <- function(emulator){
 #' 
 #' Given a validation dataset, predicts and plots the mean and 95% uncertainty interval against the true output
 #' 
-#'  @param emulator either a single output from BuildGasp, or a list of emulators
-#'  @param ValidationData a validation data frame containing inputs and true output. If NULL, validation is performed using the validation_data output of the emulator
+#' @param emulator either a single output from BuildGasp, or a list of emulators
+#' @param ValidationData a validation data frame containing inputs and true output. If NULL, validation is performed using the validation_data output of the emulator
+#' @param IndivPars 
+#' 
+#' @return 
 #'  
-#'  @export
+#' @export
 Validate <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
   q <- length(emulator$em) # 1 if a single output from BuildGasp, 0 if a list of emulators
   if (q == 1){
@@ -411,7 +502,13 @@ Validate <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
     
     preds$In95 <- preds$truth >= preds$lower95 & preds$truth <= preds$upper95
     perc_outside <- round(sum(preds$In95 == FALSE) / length(preds$In95) * 100, 1)
-    cols <- c('darkgrey', viridis(100)[31], viridis(100)[81])
+    
+    cols <- my.cols
+    
+    # Ensuring good points still coloured green if no points outside
+    if (perc_outside == 0){
+      cols[2:3] <- viridis(100)[81]
+    }
     
     plots <- ggplot(as.data.frame(preds), aes(x = truth, y = mean, col = In95)) +
       geom_errorbar(aes(ymin = lower95, ymax = upper95), col = cols[1]) +
@@ -457,7 +554,7 @@ Validate <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
       
       preds$In95 <- preds$truth >= preds$lower95 & preds$truth <= preds$upper95
       perc_outside <- round(sum(preds$In95 == FALSE) / length(preds$In95) * 100, 1)
-      cols <- c('darkgrey', viridis(100)[31], viridis(100)[81])
+      cols <- my.cols
       
       plots[[i]] <- ggplot(as.data.frame(preds), aes(x = truth, y = mean, col = In95)) +
         geom_errorbar(aes(ymin = lower95, ymax = upper95), col = cols[1]) +
