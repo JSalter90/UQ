@@ -10,16 +10,15 @@ Code for different emulation/calibration work
   
   * `code/discrepancy.R` (coming soon) will contain code for reframing history matching/calibration as a classification problem, with several worked toy examples
 
-* `applications/` contains specific applications (often related to a paper)
+* `applications/` contains specific applications , including:
+
+  * `applications/raikoke` emulating the NAME volcanic ash dispersion model, https://acp.copernicus.org/articles/24/6251/2024/
+ 
+  * `application/SECRET` pulmonary and systemic model emulation
+ 
+  * `application/SECRET/Example_EmulateTS.html` A worked example of emulating high-dimensional output
 
 See also:
 
 * Emulation with mogp_emulator: https://github.com/alan-turing-institute/mogp_emulator
 * `R` front end for mogp_emulator: https://bayesexeter.github.io/ExeterUQ_MOGP/
-
-
-
-
-
-
-
