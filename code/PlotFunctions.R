@@ -1,11 +1,10 @@
 # Some additional basis functionality, that will be combined with other source code at some point
 # Mostly plotting, but also sampling from emulator posteriors
-
 library(ggplot2)
 library(reshape2)
 
 # Colours used in several validation functions
-my.cols <- c('darkgrey', viridis(100)[31], viridis(100)[81])
+my.cols <- c('darkgrey', viridis::viridis(100)[c(31,81)])
 
 #' Plotting emulator samples
 #'
@@ -19,6 +18,7 @@ my.cols <- c('darkgrey', viridis(100)[31], viridis(100)[81])
 #' @param output_name 
 #' 
 #' @return 
+#' @import ggplot2
 #' 
 #' @export
 PlotSamples <- function(Samples, inds = NULL, Truth = NULL, input_values = NULL, input_name = NULL, output_name = NULL){
@@ -63,7 +63,7 @@ PlotSamples <- function(Samples, inds = NULL, Truth = NULL, input_values = NULL,
                             s = rep(1:ns, each = ell),
                             Run = rep(inds, each = ell*ns))
     
-    plot <- ggplot(plot_data, aes(Input, Output, col = as.factor(s))) + 
+    plot <- ggplot(plot_data, aes(.data$Input, .data$Output, col = as.factor(.data$s))) + 
       geom_line() +
       geom_line(data = data.frame(aggregate(Output ~ Input + Run, plot_data, mean)), col = 'red', size = 1.25) +
       geom_line(data = data.frame(aggregate(Output ~ Input + Run, plot_data, quantile, probs = 0.025)), col = 'red', size = 1.25, linetype = 'dashed') +
@@ -73,7 +73,7 @@ PlotSamples <- function(Samples, inds = NULL, Truth = NULL, input_values = NULL,
       labs(x = input_name, y = output_name)
       
     if (length(inds) > 1){
-      plot <- plot + facet_wrap(vars(Run))
+      plot <- plot + facet_wrap(vars(.data$Run))
     }
     
     # If provided with true output to overlay
@@ -121,15 +121,15 @@ PlotSamples <- function(Samples, inds = NULL, Truth = NULL, input_values = NULL,
                             Upper = c(Samples$upper),
                             Run = rep(inds, each = ell))
     
-    plot <- ggplot(plot_data, aes(Input, Output)) + 
+    plot <- ggplot(plot_data, aes(.data$Input, .data$Output)) + 
       geom_line(col = 'red', size = 1.25) +
-      geom_line(aes(Input, Lower), col = 'red', size = 1.25, linetype = 'dashed') +
-      geom_line(aes(Input, Upper), col = 'red', size = 1.25, linetype = 'dashed') +
+      geom_line(aes(.data$Input, .data$Lower), col = 'red', size = 1.25, linetype = 'dashed') +
+      geom_line(aes(.data$Input, .data$Upper), col = 'red', size = 1.25, linetype = 'dashed') +
       theme(legend.position = 'none') +
       labs(x = input_name, y = output_name)
     
     if (length(inds) > 1){
-      plot <- plot + facet_wrap(vars(Run))
+      plot <- plot + facet_wrap(vars(.data$Run))
     }
     
     # If provided with true output to overlay
@@ -188,10 +188,10 @@ PlotRecon <- function(DataBasis, q = 1, inds = 1:16, AddMean = TRUE, residual = 
                             Truth = c(fields) + mu,
                             Run = rep(inds, each = ell))
     
-    plot <- ggplot(plot_data, aes(Input, Output)) + 
+    plot <- ggplot(plot_data, aes(.data$Input, .data$Output)) + 
       geom_line(col = 'red', size = 1) +
-      geom_line(aes(Input, Truth), col = 'black', size = 1) +
-      facet_wrap(vars(Run)) +
+      geom_line(aes(.data$Input, .data$Truth), col = 'black', size = 1) +
+      facet_wrap(vars(.data$Run)) +
       theme(legend.position = 'none') +
       labs(x = input_name, y = output_name)
   }
@@ -201,9 +201,9 @@ PlotRecon <- function(DataBasis, q = 1, inds = 1:16, AddMean = TRUE, residual = 
                             Residual = c(fields - recons),
                             Run = rep(inds, each = ell))
     
-    plot <- ggplot(plot_data, aes(Input, Residual)) + 
+    plot <- ggplot(plot_data, aes(.data$Input, .data$Residual)) + 
       geom_line(col = 'red', size = 1) +
-      facet_wrap(vars(Run)) +
+      facet_wrap(vars(.data$Run)) +
       theme(legend.position = 'none') +
       labs(x = input_name, y = output_name)
   }
@@ -235,9 +235,9 @@ Plot1DBasis <- function(DataBasis, q = 9, input_values = NULL, input_name = NULL
                            Vec = rep(1:q, each = ell),
                            Weight = c(DataBasis$tBasis[,1:q]))
 
-  plot <- ggplot(plot_basis, aes(x = Values, y = Weight)) +
+  plot <- ggplot(plot_basis, aes(x = .data$Values, y = .data$Weight)) +
     geom_line() +
-    facet_wrap(vars(Vec)) +
+    facet_wrap(vars(.data$Vec)) +
     labs(x = input_name) +
     theme(legend.position = 'none')
   
@@ -283,7 +283,7 @@ Plot1DData <- function(DataBasis, AddMean = TRUE, inds = NULL, input_values = NU
                           Output = c(DataBasis$CentredField[,inds] + mu),
                           Run = rep(inds, each = ell))
   
-  plot <- ggplot(plot_data, aes(x = Values, y = Output, col = as.factor(Run))) +
+  plot <- ggplot(plot_data, aes(x = .data$Values, y = .data$Output, col = as.factor(.data$Run))) +
     geom_line() +
     labs(x = input_name) +
     theme(legend.position = 'none')
@@ -306,13 +306,13 @@ PlotExplained <- function(DataBasis, type = 'cumulative', ...){
   n <- ncol(DataBasis$tBasis)
   vars <- lapply(1:n, function(k) VarExplained(DataBasis$tBasis[,1:k], DataBasis$CentredField, ...))
   if (type == 'cumulative'){
-    plot <- ggplot(data.frame(q = 1:n, Proportion = unlist(vars)), aes(x = q, y = Proportion)) +
+    plot <- ggplot(data.frame(q = 1:n, Proportion = unlist(vars)), aes(x = .data$q, y = .data$Proportion)) +
       geom_line() +
       ylim(0,1) +
       labs(x = 'Vector')
   }
   if (type == 'individual'){
-    plot <- ggplot(data.frame(q = 1:n, Proportion = diff(c(0,unlist(vars)))), aes(x = q, y = Proportion)) +
+    plot <- ggplot(data.frame(q = 1:n, Proportion = diff(c(0,unlist(vars)))), aes(x = .data$q, y = .data$Proportion)) +
       geom_point() +
       ylim(0,1) +
       labs(x = 'Vector')
@@ -337,7 +337,7 @@ PlotReconError <- function(DataBasis, obs, qmax = NULL, ...){
     qmax <- n
   }
   RW <- errors(DataBasis$tBasis[,1:qmax], obs, ...)
-  plot <- ggplot(data.frame(q = 1:qmax, y = RW), aes(x = q, y = y)) +
+  plot <- ggplot(data.frame(q = 1:qmax, y = RW), aes(x = .data$q, y = .data$y)) +
     geom_line(col = 'red') +
     geom_point(col = 'red', size = 0.75) +
     ylim(0,RW[1]) +
@@ -374,9 +374,9 @@ PlotPair <- function(coeffs, x = 'C1', y = 'C2', col = NULL, obs = NULL){
                                 y = obs[,y])
   }
   
-  plot <- ggplot(plot_data, aes(x, y, col = col)) +
+  plot <- ggplot(plot_data, aes(.data$x, .data$y, col = .data$col)) +
     geom_point() +
-    scale_colour_viridis() +
+    viridis::scale_colour_viridis() +
     labs(x = x, y = y, col = col)
   
   if (!(is.null(obs))){
@@ -404,7 +404,7 @@ PlotActive <- function(Ems, InputNames){
                                              Active = InputNames %in% Ems[[i]]$active))
   }
   
-  plot <- ggplot(plot_data, aes(x = as.factor(Emulator), y = Parameter, fill = as.factor(Active))) +
+  plot <- ggplot(plot_data, aes(x = as.factor(.data$Emulator), y = .data$Parameter, fill = as.factor(.data$Active))) +
     geom_tile() +
     labs(x = 'Emulator') +
     theme(legend.position = 'none') +
@@ -423,7 +423,7 @@ PlotActive <- function(Ems, InputNames){
 #' @export
 LeaveOneOut <- function(emulator){
   em <- emulator$em
-  loo_preds <- leave_one_out_rgasp(em)
+  loo_preds <- RobustGaSP::leave_one_out_rgasp(em)
   loo_preds$lower95 <- loo_preds$mean - 1.96*loo_preds$sd
   loo_preds$upper95 <- loo_preds$mean + 1.96*loo_preds$sd
   response <- emulator$train_data[,dim(emulator$train_data)[2]]
@@ -437,11 +437,11 @@ LeaveOneOut <- function(emulator){
   cols <- my.cols
   # Ensuring good points still coloured green if no points outside
   if (perc_outside == 0){
-    cols[2:3] <- viridis(100)[81]
+    cols[2:3] <- cols[3]
   }
   
-  plot <- ggplot(as.data.frame(loo_preds), aes(x = truth, y = mean, col = In95)) +
-    geom_errorbar(aes(ymin = lower95, ymax = upper95), col = cols[1]) +
+  plot <- ggplot(as.data.frame(loo_preds), aes(x = .data$truth, y = .data$mean, col = .data$In95)) +
+    geom_errorbar(aes(ymin = .data$lower95, ymax = .data$upper95), col = cols[1]) +
     geom_point() +
     scale_colour_manual(values = c(cols[2:3])) +
     geom_abline(slope = 1, alpha = 0.6) +
@@ -507,11 +507,11 @@ Validate <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
     
     # Ensuring good points still coloured green if no points outside
     if (perc_outside == 0){
-      cols[2:3] <- viridis(100)[81]
+      cols[2:3] <- cols[3]
     }
     
-    plots <- ggplot(as.data.frame(preds), aes(x = truth, y = mean, col = In95)) +
-      geom_errorbar(aes(ymin = lower95, ymax = upper95), col = cols[1]) +
+    plots <- ggplot(as.data.frame(preds), aes(x = .data$truth, y = .data$mean, col = .data$In95)) +
+      geom_errorbar(aes(ymin = .data$lower95, ymax = .data$upper95), col = cols[1]) +
       geom_point() +
       scale_colour_manual(values = c(cols[2:3])) +
       geom_abline(slope = 1, alpha = 0.6) +
@@ -522,8 +522,8 @@ Validate <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
       plots_inputs <- NULL
       for (j in 1:dim(design)[2]){
         plot_data <- data.frame(x = design[,j], as.data.frame(preds))
-        plots_inputs[[j]] <- ggplot(plot_data, aes(x = x, y = mean, col = In95)) +
-          geom_errorbar(aes(ymin = lower95, ymax = upper95), col = cols[1]) +
+        plots_inputs[[j]] <- ggplot(plot_data, aes(x = .data$x, y = .data$mean, col = .data$In95)) +
+          geom_errorbar(aes(ymin = .data$lower95, ymax = .data$upper95), col = cols[1]) +
           geom_point() +
           scale_colour_manual(values = c(cols[2:3])) +
           labs(y = 'Prediction', x = paste0(colnames(design)[j])) +
@@ -555,9 +555,12 @@ Validate <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
       preds$In95 <- preds$truth >= preds$lower95 & preds$truth <= preds$upper95
       perc_outside <- round(sum(preds$In95 == FALSE) / length(preds$In95) * 100, 1)
       cols <- my.cols
+      if (perc_outside == 0){
+        cols[2:3] <- cols[3]
+      }
       
-      plots[[i]] <- ggplot(as.data.frame(preds), aes(x = truth, y = mean, col = In95)) +
-        geom_errorbar(aes(ymin = lower95, ymax = upper95), col = cols[1]) +
+      plots[[i]] <- ggplot(as.data.frame(preds), aes(x = .data$truth, y = .data$mean, col = .data$In95)) +
+        geom_errorbar(aes(ymin = .data$lower95, ymax = .data$upper95), col = cols[1]) +
         geom_point() +
         scale_colour_manual(values = c(cols[2:3])) +
         geom_abline(slope = 1, alpha = 0.6) +
@@ -568,8 +571,8 @@ Validate <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
         plots_inputs[[i]] <- list()
         for (j in 1:dim(design)[2]){
           plot_data <- data.frame(x = design[,j], as.data.frame(preds))
-          plots_inputs[[i]][[j]] <- ggplot(plot_data, aes(x = x, y = mean, col = In95)) +
-            geom_errorbar(aes(ymin = lower95, ymax = upper95), col = cols[1]) +
+          plots_inputs[[i]][[j]] <- ggplot(plot_data, aes(x = .data$x, y = .data$mean, col = .data$In95)) +
+            geom_errorbar(aes(ymin = .data$lower95, ymax = .data$upper95), col = cols[1]) +
             geom_point() +
             scale_colour_manual(values = c(cols[2:3])) +
             labs(y = 'Prediction', x = paste0(colnames(design)[j])) +
