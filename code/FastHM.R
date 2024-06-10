@@ -61,7 +61,7 @@ HistoryMatch <- function(DataBasis, Obs, Expectation, Variance, Error, Disc, wei
   R_W <- ReconError(Obs, Basis, weightinv = weightinv, scale = FALSE)
   # Project observations onto basis if required
   if (length(Obs) == l){
-    ObsProj <- CalcScores(Obs, Basis, weightinv = weightinv)
+    ObsProj <- Project(Obs, Basis, weightinv = weightinv)
   }
   # Project variance matrices onto basis if required
   if (dim(Disc)[1] == l){
@@ -132,7 +132,7 @@ SetDiscrepancy <- function(tBasis, q, obs, level = 0.95, weightinv = NULL){
 #' @export
 DiscardedBasisVariance <- function(DataBasis, q, weightinv = NULL){
   BasMinusQ <- DataBasis$tBasis[,-(1:q)]
-  DeletedCoeffs <- CalcScores(DataBasis$CentredField, BasMinusQ, weightinv)
+  DeletedCoeffs <- Project(DataBasis$CentredField, BasMinusQ, weightinv)
   EstVar <- apply(DeletedCoeffs, 2, var)
   DeletedBasisVar <- BasMinusQ %*% diag(EstVar) %*% t(BasMinusQ)
   return(DeletedBasisVar)
