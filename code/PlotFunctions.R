@@ -69,6 +69,7 @@ PlotSamples <- function(Samples, inds = NULL, Truth = NULL, input_values = NULL,
       geom_line(data = data.frame(aggregate(Output ~ Input + Run, plot_data, quantile, probs = 0.025)), col = 'red', size = 1.25, linetype = 'dashed') +
       geom_line(data = data.frame(aggregate(Output ~ Input + Run, plot_data, quantile, probs = 0.975)), col = 'red', size = 1.25, linetype = 'dashed') +
       scale_colour_manual(values = rep('grey', max(plot_data$s))) +
+      theme_bw() +
       theme(legend.position = 'none') +
       labs(x = input_name, y = output_name)
       
@@ -125,6 +126,7 @@ PlotSamples <- function(Samples, inds = NULL, Truth = NULL, input_values = NULL,
       geom_line(col = 'red', size = 1.25) +
       geom_line(aes(.data$Input, .data$Lower), col = 'red', size = 1.25, linetype = 'dashed') +
       geom_line(aes(.data$Input, .data$Upper), col = 'red', size = 1.25, linetype = 'dashed') +
+      theme_bw() +
       theme(legend.position = 'none') +
       labs(x = input_name, y = output_name)
     
@@ -192,6 +194,7 @@ PlotRecon <- function(DataBasis, q = 1, inds = 1:16, AddMean = TRUE, residual = 
       geom_line(col = 'red', size = 1) +
       geom_line(aes(.data$Input, .data$Truth), col = 'black', size = 1) +
       facet_wrap(vars(.data$Run)) +
+      theme_bw() +
       theme(legend.position = 'none') +
       labs(x = input_name, y = output_name)
   }
@@ -204,6 +207,7 @@ PlotRecon <- function(DataBasis, q = 1, inds = 1:16, AddMean = TRUE, residual = 
     plot <- ggplot(plot_data, aes(.data$Input, .data$Residual)) + 
       geom_line(col = 'red', size = 1) +
       facet_wrap(vars(.data$Run)) +
+      theme_bw() +
       theme(legend.position = 'none') +
       labs(x = input_name, y = output_name)
   }
@@ -239,6 +243,7 @@ Plot1DBasis <- function(DataBasis, q = 9, input_values = NULL, input_name = NULL
     geom_line() +
     facet_wrap(vars(.data$Vec)) +
     labs(x = input_name) +
+    theme_bw() +
     theme(legend.position = 'none')
   
   return(plot)
@@ -286,6 +291,7 @@ Plot1DData <- function(DataBasis, AddMean = TRUE, inds = NULL, input_values = NU
   plot <- ggplot(plot_data, aes(x = .data$Values, y = .data$Output, col = as.factor(.data$Run))) +
     geom_line() +
     labs(x = input_name) +
+    theme_bw() +
     theme(legend.position = 'none')
   
   return(plot)
@@ -309,13 +315,15 @@ PlotExplained <- function(DataBasis, type = 'cumulative', ...){
     plot <- ggplot(data.frame(q = 1:n, Proportion = unlist(vars)), aes(x = .data$q, y = .data$Proportion)) +
       geom_line() +
       ylim(0,1) +
-      labs(x = 'Vector')
+      labs(x = 'Vector') +
+      theme_bw()
   }
   if (type == 'individual'){
     plot <- ggplot(data.frame(q = 1:n, Proportion = diff(c(0,unlist(vars)))), aes(x = .data$q, y = .data$Proportion)) +
       geom_point() +
       ylim(0,1) +
-      labs(x = 'Vector')
+      labs(x = 'Vector') +
+      theme_bw()
   }
   return(plot)
 }
@@ -342,6 +350,7 @@ PlotReconError <- function(DataBasis, obs, qmax = NULL, ...){
     geom_point(col = 'red', size = 0.75) +
     ylim(0,RW[1]) +
     labs(x = 'Vector', y = 'Reconstruction Error') +
+    theme_bw() +
     geom_hline(yintercept = qchisq(0.995, length(obs))/length(obs), linetype = 'dashed')
   return(plot)
 }
@@ -377,7 +386,8 @@ PlotPair <- function(coeffs, x = 'C1', y = 'C2', col = NULL, obs = NULL){
   plot <- ggplot(plot_data, aes(.data$x, .data$y, col = .data$col)) +
     geom_point() +
     viridis::scale_colour_viridis() +
-    labs(x = x, y = y, col = col)
+    labs(x = x, y = y, col = col) +
+    theme_bw()
   
   if (!(is.null(obs))){
     plot <- plot + geom_point(data = plot_data_obs, col = 'red', size = 4, shape = 4)
@@ -446,8 +456,9 @@ LeaveOneOut <- function(emulator){
     scale_colour_manual(values = c(cols[2:3])) +
     geom_abline(slope = 1, alpha = 0.6) +
     labs(y = 'Prediction', x = 'Truth', title = paste0('Outside 95% = ', perc_outside, '%')) +
+    theme_bw() +
     theme(legend.position = 'none')
-  
+
   return(plot)
 }
 
@@ -516,6 +527,7 @@ Validate <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
       scale_colour_manual(values = c(cols[2:3])) +
       geom_abline(slope = 1, alpha = 0.6) +
       labs(y = 'Prediction', x = 'Truth', title = paste0('Outside 95% = ', perc_outside, '%')) +
+      theme_bw() +
       theme(legend.position = 'none')
 
     if (IndivPars == TRUE){
@@ -527,6 +539,7 @@ Validate <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
           geom_point() +
           scale_colour_manual(values = c(cols[2:3])) +
           labs(y = 'Prediction', x = paste0(colnames(design)[j])) +
+          theme_bw() +
           theme(legend.position = 'none')
       }
     }
@@ -565,6 +578,7 @@ Validate <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
         scale_colour_manual(values = c(cols[2:3])) +
         geom_abline(slope = 1, alpha = 0.6) +
         labs(y = 'Prediction', x = 'Truth', title = paste0('Outside 95% = ', perc_outside, '%')) +
+        theme_bw() +
         theme(legend.position = 'none')
 
       if (IndivPars == TRUE){
@@ -576,6 +590,7 @@ Validate <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
             geom_point() +
             scale_colour_manual(values = c(cols[2:3])) +
             labs(y = 'Prediction', x = paste0(colnames(design)[j])) +
+            theme_bw() +
             theme(legend.position = 'none')
         }
       }
