@@ -151,6 +151,10 @@ PredictGasp <- function(Design, emulator){
       noise_ind <- which(colnames(Design) == 'Noise')
       Design <- Design[,c(1:(noise_ind-1))]
     }
+    # Need to make sure columns are ordered in the same way as when the emulator was trained
+    col_names <- colnames(emulator$train_data)[-ncol(emulator$train_data)]
+    Design <- Design[,col_names]
+    
     preds <- predict(emulator$em, Design)
   }
   
@@ -160,6 +164,9 @@ PredictGasp <- function(Design, emulator){
       noise_ind <- which(colnames(Design) == 'Noise')
       Design <- Design[,c(1:(noise_ind-1))]
     }
+    # Need to make sure columns are ordered in the same way as when the emulator was trained
+    col_names <- colnames(emulator$train_data)[-ncol(emulator$train_data)]
+    Design <- Design[,col_names]
     X <- cbind(rep(1,dim(Design)[1]), Design)
     preds <- predict(emulator$em, Design, testing_trend = as.matrix(X))
   }
@@ -167,6 +174,9 @@ PredictGasp <- function(Design, emulator){
   else if (emulator$mean_fn == 'lm'){
     tt <- terms(emulator$lm)
     Terms <- delete.response(tt)
+    # Need to make sure columns are ordered in the same way as when the emulator was trained
+    col_names <- colnames(emulator$train_data)[-ncol(emulator$train_data)]
+    Design <- Design[,col_names]
     mm <- model.frame(Terms, Design, xlev = emulator$lm$xlevels)
     X <- model.matrix(Terms, mm, contrasts.arg = emulator$lm$contrasts)
     preds <- predict(emulator$em, Design, testing_trend = as.matrix(X))
@@ -193,6 +203,7 @@ PredictGasp <- function(Design, emulator){
   }
   return(preds)
 }
+
 
 
 #' Fitting multiple GaSP emulators
