@@ -1,19 +1,12 @@
-setwd("~/Dropbox/Exeter/Projects/UQ4Covid/CountBasis_paper")
-source('code/0_CountBasis.R')
-
-# setwd('~/Dropbox/UQ')
-# source('code/Gasp.R')
-# setwd('~/Dropbox/UQ')
-# source('code/PlotFunctions.R')
-# setwd("~/Dropbox/Exeter/Projects/UQ4Covid/CountBasis_paper")
+source('applications/UQ4Covid/0_CountBasis.R')
 
 #### Design ####
-design <- read.csv('data/design.csv')
+design <- read.csv('applications/UQ4Covid/data/design.csv')
 design$lock_1_restrict <- NULL
 design$lock_2_release <- NULL
 
 # Scale inputs to [-1,1]
-parRanges <- read.csv('data/parRanges.csv')
+parRanges <- read.csv('applications/UQ4Covid/data/parRanges.csv')
 parRanges <- rbind(parRanges,
                    data.frame(parameter = c('alphaTH', 'etaTH', 'alphaEP', 'alphaI1D', 'alphaHD', 'alphaI1H', 'eta'),
                               lower = c(-1.25, 0.005, -4.35, -20, -20, -4.6, 0.005),
@@ -29,7 +22,7 @@ for (i in 1:15){
 
 
 #### Outputs, LAD level ####
-output_LAD <- readRDS('data/output_LAD.rds')
+output_LAD <- readRDS('applications/UQ4Covid/data/output_LAD.rds')
 
 # Grouping LADs by region
 LAD_NE <- unique(subset(output_LAD, region == 'E12000001')$LAD19CD)
@@ -41,6 +34,12 @@ LAD_EE <- unique(subset(output_LAD, region == 'E12000006')$LAD19CD)
 LAD_LO <- unique(subset(output_LAD, region == 'E12000007')$LAD19CD)
 LAD_SE <- unique(subset(output_LAD, region == 'E12000008')$LAD19CD)
 LAD_SW <- unique(subset(output_LAD, region == 'E12000009')$LAD19CD)
+
+# Central longitude/latitude of LADs
+lad2019 <- read.csv('applications/UQ4Covid/data/LAD2019.csv') # contains NI and Scotland, model output doesn't
+LonLat <- data.frame(LAD2019CD = lad2019$lad19cd,
+                     Longitude = lad2019$long,
+                     Latitude = lad2019$lat)
 
 #' Processing model output into a matrix
 #'
@@ -82,7 +81,7 @@ ProcessData <- function(data, by_id = 'LAD19CD', output = 'deaths'){
 }
 
 # # Example
-# output_LAD <- readRDS('data/output_LAD.rds')
+# output_LAD <- readRDS('applications/UQ4Covid/data/output_LAD.rds')
 # ens_data <- ProcessData(subset(output_LAD, week == 12 & replicate == 1))
 # 
 # # Some checks that worked
@@ -104,61 +103,9 @@ ProcessData <- function(data, by_id = 'LAD19CD', output = 'deaths'){
 # tmp2 <- aggregate(cumH ~ LAD19CD, subset(output_LAD, week == 12 & replicate == 1), sum)$cumH
 # summary(tmp1 - tmp2)
 
-# Central longitude/latitude of LADs
-lad2019 <- read.csv('data/LAD2019.csv') # contains NI and Scotland, model output doesn't
-LonLat <- data.frame(LAD2019CD = lad2019$lad19cd,
-                     Longitude = lad2019$long,
-                     Latitude = lad2019$lat)
 
 #### Outputs, ward level ####
-# Full output stored on external drive, contains all wards by week x age, large file
-# Process data
-# setwd("/Volumes/Extreme_SSD/data/UQ4Covid/waves")
-# library(RSQLite)
-# con <- dbConnect(SQLite(), 'wave04_fixedseeds_summaries_default.db')
-# week12 <- dbGetQuery(con, "SELECT * FROM compact WHERE week = 12")
-# dbDisconnect(con)
-# dim(week12) # 45197600x9
-# 
-# # Aggregate by age
-# week12$deaths <- week12$cumHD + week12$cumCD
-# week12$Hprev_mn <- NULL
-# week12$week <- NULL
-# week12$replicate[is.na(week12$replicate)] <- 1
-# week12$age <- as.factor(week12$age)
-# week12$output <- as.factor(week12$output)
-# week12_sum <- aggregate(cbind(cumH,cumHD,cumCD,deaths) ~ output + replicate + ward, data = week12, sum)
-# dim(week12_sum) # 5649700 = 8071x700
-# 
-# # Assign various spatial regions to ward level data
-# setwd("~/Dropbox/Exeter/Projects/UQ4Covid/CountBasis_paper")
-# wards <- read.csv("data/Ward19_Lookup.csv")
-# week12_sum$ward <- factor(wards$WD19CD[week12_sum$ward], levels = wards$WD19CD)
-# 
-# # Also merge in LAD as have this anyway
-# week12_sum <- week12_sum %>% left_join(wards[,c('WD19CD', 'LAD19CD')], by = c('ward' = 'WD19CD'))
-# 
-# # Now merge in region
-# load('data/ward_to_region.RData') # contains ward IDs, region IDs
-# week12_sum <- week12_sum %>% left_join(ward_to_region, by = c('ward' = 'ward'))
-# 
-# saveRDS(week12_sum, file = 'data/output_ward.rds')
-# 
-# # Check that data is consistent
-# output_LAD <- readRDS("data/output_LAD.rds")
-# output_LAD <- subset(output_LAD, week == 12)
-# week12_region <- aggregate(cbind(cumH,cumHD,cumCD,deaths) ~ output + replicate + region, data = week12_sum, FUN = sum)
-# week12_lad <- aggregate(cbind(cumH,cumHD,cumCD,deaths) ~ output + replicate + LAD19CD, data = week12_sum, FUN = sum)
-# 
-# head(week12_lad)
-# head(output_LAD)
-# summary(week12_lad$deaths)
-# summary(output_LAD$deaths)
-# summary(week12_lad$deaths - output_LAD$deaths)
-# summary(week12_lad$cumH - output_LAD$cumH)
-
-# Load in processed ward data
-output_ward <- readRDS('data/output_ward.rds')
+output_ward <- readRDS('applications/UQ4Covid/data/output_ward.rds')
 
 # Grouping wards by region
 ward_NE <- unique(subset(output_ward, region == 'E12000001')$ward)
@@ -172,11 +119,7 @@ ward_SE <- unique(subset(output_ward, region == 'E12000008')$ward)
 ward_SW <- unique(subset(output_ward, region == 'E12000009')$ward)
 
 # Central longitude/latitude of wards
-# load('data/ward_lookup_lon_lat.RData')
-# ward_lookup$lon <- ward_lookup$lon/10^5 - 5.4
-# ward_lookup$lat <- ward_lookup$lat/10^5 + 49.7
-# saveRDS(ward_lookup, file = 'data/ward_lookup_lon_lat.rds')
-ward2019 <- readRDS('data/ward_lookup_lon_lat.rds')
+ward2019 <- readRDS('applications/UQ4Covid/data/ward2019.rds')
 LonLatWard <- data.frame(ward = ward2019$WD19CD,
                          Longitude = ward2019$lon,
                          Latitude = ward2019$lat)
