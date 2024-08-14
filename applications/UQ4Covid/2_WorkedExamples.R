@@ -1,9 +1,8 @@
-setwd("~/Dropbox/Exeter/Projects/UQ4Covid/CountBasis_paper")
-source('code/1_ProcessData.R') # also loads in 0_CountBasis.R
-setwd('~/Dropbox/UQ/')
+source('applications/UQ4Covid/1_ProcessData.R') # also loads in 0_CountBasis.R
+
+# Also load in generic emulation/plotting functions from github.com/JSalter90/UQ
 source('code/PlotFunctions.R')
 source('code/Gasp.R')
-setwd("~/Dropbox/Exeter/Projects/UQ4Covid/CountBasis_paper")
 
 # Inputs
 dim(design) # 250 unique input sets, $repeats gives number of replicates for each
@@ -51,9 +50,9 @@ summary(basis_deaths)
 dim(basis_deaths$tBasis) # 339x10
 
 # Plot leading basis vectors
-png('plots/basis_LAD.png', width = 1344, height = 960, res = 200)
+#png('plots/basis_LAD.png', width = 1344, height = 960, res = 200)
 PlotBasis(basis_deaths, q = 4, LonLat[match(train_data$location, LonLat$LAD2019CD),2:3])
-dev.off()
+#dev.off()
 
 # Extract coefficients, combine with design
 # Need to use tags in $run$output to match up with design
@@ -64,7 +63,7 @@ PlotPair(tData, 'C1', 'C2', col = 'R0')
 PlotPair(tData, 'R0', 'ns', col = 'C1')
 
 # Now just need to emulate the latent coefficients, for the leading q basis vectors
-# For comparison, try both a standard stationary homoscedastic GP, vs hetGP
+# For comparison, try both a standard sGP, vs hetGP
 EmDeaths <- BasisEmulators(tData, 6, mean_fn = 'step', training_prop = 1)
 PlotActive(EmDeaths, InputNames = colnames(tData)[1:15])
 LOOs <- lapply(1:length(EmDeaths), function(k) LeaveOneOut(EmDeaths[[k]]))
@@ -95,11 +94,6 @@ EmDeathsHet <- BasisEmulatorsHet(tData, 3, training_prop = 1)
 Preds_val_Het <- BasisPredHet(val_inputs[,1:15], EmDeathsHet)
 val_response_Het <- CountBasisEmSamples(Preds_val_Het, basis_deaths, ReturnAll = TRUE)
 
-# Store objects for reproducing plots later
-saveRDS(val_response_Het, 'data/val_het_LAD.rds')
-saveRDS(val_data, 'data/val_data_LAD.rds')
-saveRDS(Preds_val_Het, 'data/preds_het_LAD.rds')
-
 cowplot::plot_grid(ValidateSum(val_response$samples, val_data$data), 
                    ValidateSum(val_response_Het$samples, val_data$data), nrow = 1)
 Metrics::rmse(apply(val_data$data,2,sum), apply(val_response$samples,3,sum))
@@ -115,8 +109,6 @@ PlotSamplesCount(val_response_Het$samples[,1:100,], locs = which(val_data$locati
 
 # Specific locations
 ValidateSum(val_response_Het$samples, val_data$data, locs = 2)
-
-
 
 
 #### Including replicates ####
@@ -147,7 +139,6 @@ tData_rep <- GetEmDataCount(design_em[match(train_data$run$output, design_em$out
 
 # To assess the stochasticity, can plot the variability in the coefficients for sets of replicates
 CoeffPlots <- lapply(1:8, function(k) PlotCoeffs(basis_deaths_rep, k, run_ids = train_data$run, plot_inds = 1:12))
-saveRDS(CoeffPlots, file = 'data/CoeffPlots.rds')
 cowplot::plot_grid(CoeffPlots[[1]],CoeffPlots[[2]],CoeffPlots[[3]],CoeffPlots[[4]])
 cowplot::plot_grid(CoeffPlots[[5]],CoeffPlots[[6]],CoeffPlots[[7]],CoeffPlots[[8]])
 
@@ -157,10 +148,6 @@ val_inputs <- design_em[match(val_data$run$output, design_em$output),1:15] # inc
 Preds_val_Het_rep <- BasisPredHet(val_inputs[,1:15], EmDeathsHet_rep)
 val_response_Het_rep <- CountBasisEmSamples(Preds_val_Het_rep, basis_deaths_rep, ReturnAll = TRUE)
 ValidateSum(val_response_Het_rep$samples, val_data$data)
-
-# Store objects for reproducing plots later
-saveRDS(val_response_Het_rep, 'data/val_het_LAD_reps.rds')
-saveRDS(val_data, 'data/val_data_LAD_reps.rds')
 
 # As before, we can sample from the emulator and plot these vs different locations
 # We can also plot the multiple replicates we observe vs these samples
@@ -202,9 +189,8 @@ dim(train_data$data) # 8071 x 200
 dim(val_data$data) # 8071 x 50
 
 # Construct basis
-# basis_wards <- CountBasis(train_data$data, rank = 10) # rank is a design choice, use small value here for speed
-# saveRDS(basis_wards, file = 'data/basis_wards_example.rds')
-basis_wards <- readRDS('data/basis_wards_example.rds')
+# The R object created here is 1GB, hence not stored on GitHub
+basis_wards <- CountBasis(train_data$data, rank = 10) # rank is a design choice, use small value here for speed
 dim(basis_wards$tBasis) # 8071x10
 
 # Plot leading basis vectors
@@ -225,9 +211,6 @@ Preds_val_Het <- BasisPredHet(val_inputs[,1:15], EmWardsHet)
 val_wards_Het <- CountBasisEmSamples(Preds_val_Het, basis_wards, ReturnAll = TRUE)
 ValidateSum(val_wards_Het$samples, val_data$data)
 
-saveRDS(val_wards_Het, 'data/val_het_ward.rds')
-saveRDS(val_data, 'data/val_data_ward.rds')
-
 # Compare to LAD emulator
 cowplot::plot_grid(ValidateSum(val_response_Het$samples, val_data$data), 
                    ValidateSum(val_wards_Het$samples, val_data$data), nrow = 1)
@@ -243,4 +226,3 @@ Metrics::rmse(log(apply(val_data$data,2,sum)+1), log(apply(val_wards_Het$samples
 PlotSamplesCount(val_wards_Het$samples[,1:100,], locs = which(val_data$location %in% ward_NE), runs = 1:9, Truth = val_data$data)
 
 # Generalises to replicates in the same way as above
-
