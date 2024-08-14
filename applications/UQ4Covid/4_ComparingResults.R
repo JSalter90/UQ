@@ -1,7 +1,5 @@
-# Load in predictions generated from 3_RunningExperiments, compare with different metrics
-setwd("~/Dropbox/Exeter/Projects/UQ4Covid/CountBasis_paper")
-source('code/1_ProcessData.R')
-setwd("~/Dropbox/Exeter/Projects/UQ4Covid/CountBasis_paper/data/samples_final_LAD")
+source('applications/UQ4Covid/1_ProcessData.R') # also loads in 0_CountBasis.R
+setwd('applications/UQ4Covid')
 
 # Load in each in turn, store predictions
 set.seed(3929)
@@ -13,11 +11,11 @@ experiments$RMSE_Total <- experiments$In95_Total <- NA
 experiments$RMSE_Total_Het <- experiments$In95_Total_Het <- NA
 
 for (i in 1:nrow(experiments)){
-  All_em <- readRDS(paste0('Total/All_em_', experiments$seed[i], '.rds'))
+  All_em <- readRDS(paste0('data/samples_final_LAD/Total/All_em_', experiments$seed[i], '.rds'))
   experiments$RMSE_Total[i] <- Metrics::rmse(All_em$Truth, All_em$Mean)
   experiments$In95_Total[i] <- sum(All_em$In95) / nrow(All_em)
   
-  All_em_het <- readRDS(paste0('Total/All_em_het_', experiments$seed[i], '.rds'))
+  All_em_het <- readRDS(paste0('data/samples_final_LAD/Total/All_em_het_', experiments$seed[i], '.rds'))
   experiments$RMSE_Total_Het[i] <- Metrics::rmse(All_em_het$Truth, All_em_het$Mean)
   experiments$In95_Total_Het[i] <- sum(All_em_het$In95) / nrow(All_em_het)
 }
@@ -29,35 +27,35 @@ summary(experiments$In95_Total)
 summary(experiments$In95_Total_Het)
 
 # Each region metric
-results_all <- experiments
-results_all$Region <- 'All'
+results_LAD <- experiments
+results_LAD$Region <- 'All'
 
 for (r in 1:9){
-  results_region <- results_all[1:nrow(experiments),]
+  results_region <- results_LAD[1:nrow(experiments),]
   results_region$Region <- paste0('E1200000', r)
   results_region$In95_Total <- results_region$RMSE_Total <- results_region$In95_Total_Het <- results_region$RMSE_Total_Het <- NA
   for (i in 1:nrow(experiments)){
-    All_em <- readRDS(paste0('E1200000', r, '/E1200000', r, '_em_', experiments$seed[i], '.rds'))
+    All_em <- readRDS(paste0('data/samples_final_LAD/E1200000', r, '/E1200000', r, '_em_', experiments$seed[i], '.rds'))
     results_region$RMSE_Total[i] <- Metrics::rmse(All_em$Truth, All_em$Mean)
     results_region$In95_Total[i] <- sum(All_em$In95) / nrow(All_em)
     
-    All_em_het <- readRDS(paste0('E1200000', r, '/E1200000', r, '_em_het_', experiments$seed[i], '.rds'))
+    All_em_het <- readRDS(paste0('data/samples_final_LAD/E1200000', r, '/E1200000', r, '_em_het_', experiments$seed[i], '.rds'))
     results_region$RMSE_Total_Het[i] <- Metrics::rmse(All_em_het$Truth, All_em_het$Mean)
     results_region$In95_Total_Het[i] <- sum(All_em_het$In95) / nrow(All_em_het)
   }
   
-  results_all <- rbind(results_all, results_region)
+  results_LAD <- rbind(results_LAD, results_region)
 }
 
-results_all$Region <- as.factor(results_all$Region)
-summary(results_all$Region)
-summary(results_all$RMSE_Total)
-summary(results_all$RMSE_Total_Het)
-summary(results_all$In95_Total)
-summary(results_all$In95_Total_Het)
+results_LAD$Region <- as.factor(results_LAD$Region)
+summary(results_LAD$Region)
+summary(results_LAD$RMSE_Total)
+summary(results_LAD$RMSE_Total_Het)
+summary(results_LAD$In95_Total)
+summary(results_LAD$In95_Total_Het)
 
 # Add equivalent metrics for each basis approach
-results_all$Basis <- 'None'
+results_LAD$Basis <- 'None'
 
 # The outputs here are samples across all LADs/wards
 # To compare, need to aggregate to appropriate region, and link id to true output
@@ -65,16 +63,16 @@ results_all$Basis <- 'None'
 totals <- aggregate(deaths ~ output + replicate, subset(output_LAD, week == 12 & replicate == 1), sum)
 totals$LogDeaths <- log(totals$deaths)
 
-results_tmp <- results_all[1:nrow(experiments),]
+results_tmp <- results_LAD[1:nrow(experiments),]
 results_tmp$Region <- 'All'
 results_tmp$Basis <- 'PLNPCA'
 results_tmp$In95_Total <- results_tmp$RMSE_Total <- results_tmp$In95_Total_Het <- results_tmp$RMSE_Total_Het <- NA
 
 for (i in 1:nrow(experiments)){
   # Check that simulation exists
-  test <- list.files('PLNPCA/', pattern = paste0(experiments$seed[i]))
+  test <- list.files('data/samples_final_LAD/PLNPCA/', pattern = paste0(experiments$seed[i]))
   if (length(test) > 0){
-    All_em <- readRDS(paste0('PLNPCA/basis_PLNPCA_em_', experiments$seed[i], '.rds'))
+    All_em <- readRDS(paste0('data/samples_final_LAD/PLNPCA/basis_PLNPCA_em_', experiments$seed[i], '.rds'))
     tmp <- AggregateSamples(All_em$samples)
     tmp2 <- data.frame(Mean = log(tmp$mean),
                        Lower = log(tmp$lower),
@@ -85,7 +83,7 @@ for (i in 1:nrow(experiments)){
     results_tmp$RMSE_Total[i] <- Metrics::rmse(tmp2$Truth, tmp2$Mean)
     results_tmp$In95_Total[i] <- sum(tmp2$In95) / nrow(tmp2)
     
-    All_em <- readRDS(paste0('PLNPCA/basis_PLNPCA_em_het_', experiments$seed[i], '.rds'))
+    All_em <- readRDS(paste0('data/samples_final_LAD/PLNPCA/basis_PLNPCA_em_het_', experiments$seed[i], '.rds'))
     tmp <- AggregateSamples(All_em$samples)
     tmp2 <- data.frame(Mean = log(tmp$mean),
                        Lower = log(tmp$lower),
@@ -98,7 +96,7 @@ for (i in 1:nrow(experiments)){
   }
 }
 
-results_all <- rbind(results_all, results_tmp)
+results_LAD <- rbind(results_LAD, results_tmp)
 
 # Repeat by region
 # Need to be careful that compare properly when did log(x+1) for the individual emulator
@@ -113,7 +111,7 @@ ind_region <- list(LAD_NE, LAD_NW, LAD_YO, LAD_EM, LAD_WM, LAD_EE, LAD_LO, LAD_S
 location_ids <- unique(output_LAD$LAD19CD)
 
 for (r in 1:9){
-  results_region <- results_all[1:nrow(experiments),]
+  results_region <- results_LAD[1:nrow(experiments),]
   results_region$Region <- paste0('E1200000', r)
   results_region$Basis <- 'PLNPCA'
   results_region$In95_Total <- results_region$RMSE_Total <- results_region$In95_Total_Het <- results_region$RMSE_Total_Het <- NA
@@ -122,9 +120,9 @@ for (r in 1:9){
   
   for (i in 1:nrow(experiments)){
     # Check that simulation exists
-    test <- list.files('PLNPCA/', pattern = paste0(experiments$seed[i]))
+    test <- list.files('data/samples_final_LAD/PLNPCA/', pattern = paste0(experiments$seed[i]))
     if (length(test) > 0){
-      All_em <- readRDS(paste0('PLNPCA/basis_PLNPCA_em_', experiments$seed[i], '.rds'))
+      All_em <- readRDS(paste0('data/samples_final_LAD/PLNPCA/basis_PLNPCA_em_', experiments$seed[i], '.rds'))
       tmp <- AggregateSamples(All_em$samples, locs = which(location_ids %in% ind_region[[r]]))
       if (any(totals_region$deaths == 0)){
         tmp2 <- data.frame(Mean = log(tmp$mean + 1),
@@ -144,7 +142,7 @@ for (r in 1:9){
       results_region$RMSE_Total[i] <- Metrics::rmse(tmp2$Truth, tmp2$Mean)
       results_region$In95_Total[i] <- sum(tmp2$In95) / nrow(tmp2)
       
-      All_em <- readRDS(paste0('PLNPCA/basis_PLNPCA_em_het_', experiments$seed[i], '.rds'))
+      All_em <- readRDS(paste0('data/samples_final_LAD/PLNPCA/basis_PLNPCA_em_het_', experiments$seed[i], '.rds'))
       tmp <- AggregateSamples(All_em$samples, locs = which(location_ids %in% ind_region[[r]]))
       if (any(totals_region$deaths == 0)){
         tmp2 <- data.frame(Mean = log(tmp$mean + 1),
@@ -165,31 +163,31 @@ for (r in 1:9){
       results_region$In95_Total_Het[i] <- sum(tmp2$In95) / nrow(tmp2)
     }
   }
-  results_all <- rbind(results_all, results_region)
+  results_LAD <- rbind(results_LAD, results_region)
 }
 
-results_all$Basis <- as.factor(results_all$Basis)
+results_LAD$Basis <- as.factor(results_LAD$Basis)
 
-saveRDS(results_all, file = 'results_all.rds')
+saveRDS(results_LAD, file = 'data/results_LAD.rds')
 
 
 
 # Repeating for SVD
-results_all <- readRDS('results_all.rds')
+results_LAD <- readRDS('data/results_LAD.rds')
 
 totals <- aggregate(deaths ~ output + replicate, subset(output_LAD, week == 12 & replicate == 1), sum)
 totals$LogDeaths <- log(totals$deaths)
 
-results_tmp <- results_all[1:nrow(experiments),]
+results_tmp <- results_LAD[1:nrow(experiments),]
 results_tmp$Region <- 'All'
 results_tmp$Basis <- 'SVD'
 results_tmp$In95_Total <- results_tmp$RMSE_Total <- results_tmp$In95_Total_Het <- results_tmp$RMSE_Total_Het <- NA
 
 for (i in 1:nrow(experiments)){
   # Check that simulation exists
-  test <- list.files('SVD/', pattern = paste0(experiments$seed[i]))
+  test <- list.files('data/samples_final_LAD/SVD/', pattern = paste0(experiments$seed[i]))
   if (length(test) > 0){
-    All_em <- readRDS(paste0('SVD/basis_SVD_em_', experiments$seed[i], '.rds'))
+    All_em <- readRDS(paste0('data/samples_final_LAD/SVD/basis_SVD_em_', experiments$seed[i], '.rds'))
     tmp <- AggregateSamples(All_em$samples)
     tmp2 <- data.frame(Mean = log(tmp$mean),
                        Lower = log(tmp$lower),
@@ -200,7 +198,7 @@ for (i in 1:nrow(experiments)){
     results_tmp$RMSE_Total[i] <- Metrics::rmse(tmp2$Truth, tmp2$Mean)
     results_tmp$In95_Total[i] <- sum(tmp2$In95) / nrow(tmp2)
     
-    All_em <- readRDS(paste0('SVD/basis_SVD_em_het_', experiments$seed[i], '.rds'))
+    All_em <- readRDS(paste0('data/samples_final_LAD/SVD/basis_SVD_em_het_', experiments$seed[i], '.rds'))
     tmp <- AggregateSamples(All_em$samples)
     tmp2 <- data.frame(Mean = log(tmp$mean),
                        Lower = log(tmp$lower),
@@ -213,7 +211,7 @@ for (i in 1:nrow(experiments)){
   }
 }
 
-results_all <- rbind(results_all, results_tmp)
+results_LAD <- rbind(results_LAD, results_tmp)
 
 # Repeat by region
 totals <- aggregate(deaths ~ output + replicate + region, subset(output_LAD, week == 12 & replicate == 1), sum)
@@ -227,7 +225,7 @@ ind_region <- list(LAD_NE, LAD_NW, LAD_YO, LAD_EM, LAD_WM, LAD_EE, LAD_LO, LAD_S
 location_ids <- unique(output_LAD$LAD19CD)
 
 for (r in 1:9){
-  results_region <- results_all[1:nrow(experiments),]
+  results_region <- results_LAD[1:nrow(experiments),]
   results_region$Region <- paste0('E1200000', r)
   results_region$Basis <- 'SVD'
   results_region$In95_Total <- results_region$RMSE_Total <- results_region$In95_Total_Het <- results_region$RMSE_Total_Het <- NA
@@ -236,9 +234,9 @@ for (r in 1:9){
   
   for (i in 1:nrow(experiments)){
     # Check that simulation exists
-    test <- list.files('SVD/', pattern = paste0(experiments$seed[i]))
+    test <- list.files('data/samples_final_LAD/SVD/', pattern = paste0(experiments$seed[i]))
     if (length(test) > 0){
-      All_em <- readRDS(paste0('SVD/basis_SVD_em_', experiments$seed[i], '.rds'))
+      All_em <- readRDS(paste0('data/samples_final_LAD/SVD/basis_SVD_em_', experiments$seed[i], '.rds'))
       tmp <- AggregateSamples(All_em$samples, locs = which(location_ids %in% ind_region[[r]]))
       if (any(totals_region$deaths == 0)){
         tmp2 <- data.frame(Mean = log(tmp$mean + 1),
@@ -258,7 +256,7 @@ for (r in 1:9){
       results_region$RMSE_Total[i] <- Metrics::rmse(tmp2$Truth, tmp2$Mean)
       results_region$In95_Total[i] <- sum(tmp2$In95) / nrow(tmp2)
       
-      All_em <- readRDS(paste0('SVD/basis_SVD_em_het_', experiments$seed[i], '.rds'))
+      All_em <- readRDS(paste0('data/samples_final_LAD/SVD/basis_SVD_em_het_', experiments$seed[i], '.rds'))
       tmp <- AggregateSamples(All_em$samples, locs = which(location_ids %in% ind_region[[r]]))
       if (any(totals_region$deaths == 0)){
         tmp2 <- data.frame(Mean = log(tmp$mean + 1),
@@ -279,12 +277,12 @@ for (r in 1:9){
       results_region$In95_Total_Het[i] <- sum(tmp2$In95) / nrow(tmp2)
     }
   }
-  results_all <- rbind(results_all, results_region)
+  results_LAD <- rbind(results_LAD, results_region)
 }
 
-results_all$Basis <- as.factor(results_all$Basis)
+results_LAD$Basis <- as.factor(results_LAD$Basis)
 
-saveRDS(results_all, file = 'results_all.rds')
+saveRDS(results_LAD, file = 'data/results_LAD.rds')
 
 
 
@@ -293,8 +291,7 @@ saveRDS(results_all, file = 'results_all.rds')
 
 #### Repeating for ward-level samples ####
 # Larger files, stored separately
-# Create results file from scratch, then combine with results_all
-setwd("/Volumes/Extreme_SSD/data/CountBasis/samples_final_ward")
+# Create results file from scratch, then combine with results_LAD
 set.seed(3929)
 experiments <- data.frame(n = rep(c(100,150,200), each = 50),
                           seed = sample(1:10^6, 150))
@@ -309,9 +306,9 @@ totals$LogDeaths <- log(totals$deaths)
 
 for (i in 1:nrow(experiments)){
   # Check that simulation exists
-  test <- list.files('PLNPCA/', pattern = paste0(experiments$seed[i]))
+  test <- list.files('data/samples_final_ward/PLNPCA/', pattern = paste0(experiments$seed[i]))
   if (length(test) > 0){
-    All_em <- readRDS(paste0('PLNPCA/basis_PLNPCA_em_', experiments$seed[i], '.rds'))
+    All_em <- readRDS(paste0('data/samples_final_ward/PLNPCA/basis_PLNPCA_em_', experiments$seed[i], '.rds'))
     tmp <- AggregateSamples(All_em$samples)
     tmp2 <- data.frame(Mean = log(tmp$mean),
                        Lower = log(tmp$lower),
@@ -322,7 +319,7 @@ for (i in 1:nrow(experiments)){
     results_ward$RMSE_Total[i] <- Metrics::rmse(tmp2$Truth, tmp2$Mean)
     results_ward$In95_Total[i] <- sum(tmp2$In95) / nrow(tmp2)
     
-    All_em <- readRDS(paste0('PLNPCA/basis_PLNPCA_em_het_', experiments$seed[i], '.rds'))
+    All_em <- readRDS(paste0('data/samples_final_ward/PLNPCA/basis_PLNPCA_em_het_', experiments$seed[i], '.rds'))
     tmp <- AggregateSamples(All_em$samples)
     tmp2 <- data.frame(Mean = log(tmp$mean),
                        Lower = log(tmp$lower),
@@ -335,7 +332,6 @@ for (i in 1:nrow(experiments)){
   }
 }
 
-setwd("~/Dropbox/Exeter/Projects/UQ4Covid/CountBasis_paper")
 saveRDS(results_ward, file = 'data/results_ward.rds')
 
 # Repeat by region
@@ -348,7 +344,6 @@ ind_region <- list(ward_NE, ward_NW, ward_YO, ward_EM, ward_WM, ward_EE, ward_LO
 
 # List all LAD indices
 location_ids <- unique(output_ward$ward)
-setwd("/Volumes/Extreme_SSD/data/CountBasis/samples_final_ward")
 for (r in 1:9){
   results_region <- results_ward[1:nrow(experiments),]
   results_region$Region <- paste0('E1200000', r)
@@ -359,9 +354,9 @@ for (r in 1:9){
   
   for (i in 1:nrow(experiments)){
     # Check that simulation exists
-    test <- list.files('PLNPCA/', pattern = paste0(experiments$seed[i]))
+    test <- list.files('data/samples_final_ward/PLNPCA/', pattern = paste0(experiments$seed[i]))
     if (length(test) > 0){
-      All_em <- readRDS(paste0('PLNPCA/basis_PLNPCA_em_', experiments$seed[i], '.rds'))
+      All_em <- readRDS(paste0('data/samples_final_ward/PLNPCA/basis_PLNPCA_em_', experiments$seed[i], '.rds'))
       
       if (dim(All_em$samples)[1] == 8071){
         location_ids <- unique(output_ward$ward)
@@ -412,7 +407,7 @@ for (r in 1:9){
       results_region$RMSE_Total[i] <- Metrics::rmse(tmp2$Truth, tmp2$Mean)
       results_region$In95_Total[i] <- sum(tmp2$In95) / nrow(tmp2)
       
-      All_em <- readRDS(paste0('PLNPCA/basis_PLNPCA_em_het_', experiments$seed[i], '.rds'))
+      All_em <- readRDS(paste0('data/samples_final_ward/PLNPCA/basis_PLNPCA_em_het_', experiments$seed[i], '.rds'))
       tmp <- AggregateSamples(All_em$samples, locs = which(location_ids %in% ind_region[[r]]))
       if (any(totals_region$deaths == 0)){
         tmp2 <- data.frame(Mean = log(tmp$mean + 1),
@@ -436,8 +431,6 @@ for (r in 1:9){
   results_ward <- rbind(results_ward, results_region)
 }
 
-#results_all$Basis <- as.factor(results_all$Basis)
-setwd("~/Dropbox/Exeter/Projects/UQ4Covid/CountBasis_paper")
 saveRDS(results_ward, file = 'data/results_ward.rds')
 
 
@@ -446,15 +439,14 @@ saveRDS(results_ward, file = 'data/results_ward.rds')
 
 #### Summarising results for tables ####
 library(dplyr)
-setwd("~/Dropbox/Exeter/Projects/UQ4Covid/CountBasis_paper")
-results_all <- readRDS('data/samples_final_LAD/results_all.rds')
+results_LAD <- readRDS('data/results_LAD.rds')
 results_ward <- readRDS('data/results_ward.rds')
 results_ward$Region <- as.factor(results_ward$Region)
 
 # Select only the HetGP results, except for aggregations (Basis = 'None')
-tmp <- subset(results_all, Basis == 'None')
-tmp2 <- subset(results_all[,-c(3:4)], Basis == 'PLNPCA')
-tmp3 <- subset(results_all[,-c(3:4)], Basis == 'SVD')
+tmp <- subset(results_LAD, Basis == 'None')
+tmp2 <- subset(results_LAD[,-c(3:4)], Basis == 'PLNPCA')
+tmp3 <- subset(results_LAD[,-c(3:4)], Basis == 'SVD')
 tmp$Basis <- tmp2$Basis <- tmp3$Basis <- NULL
 colnames(tmp)[3:6] <- c('In95_Single_GP', 'RMSE_Single_GP', 'In95_Single', 'RMSE_Single')
 colnames(tmp2)[3:4] <- c('In95_Basis', 'RMSE_Basis')
