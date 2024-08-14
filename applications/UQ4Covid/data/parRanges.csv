@@ -1,0 +1,11 @@
+parameter,lower,upper
+R0,2,4.5
+TE,0.1,2
+TP,1.2,4
+TI1,2.8,4.5
+TI2,1e-4,0.5
+nuA,0,1
+lock_1_restrict,0,1
+lock_2_release,0,1
+ns,10,100
+p_home_weekend,0,1
