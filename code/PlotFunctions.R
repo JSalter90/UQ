@@ -356,6 +356,48 @@ PlotReconError <- function(DataBasis, obs, qmax = NULL, ...){
 }
 
 
+#' Plots residual for each basis truncation
+#'
+#' @param DataBasis 
+#' @param obs 
+#' @param q 
+#' @param input_values 
+#' @param input_name 
+#' @param ... 
+#'
+#' @return
+#' @export
+PlotResid <- function(DataBasis, obs, q, input_values = NULL, input_name = NULL, ...){
+  ell <- nrow(DataBasis$tBasis)
+  if (is.null(input_values)){
+    input_values <- 1:ell
+  }
+  if (is.null(input_name)){
+    input_name <- 'Input'
+  }
+  
+  plot_resids <- NULL
+  for (i in 1:q){
+    tmp <- ReconField(obs, DataBasis$tBasis[,1:i], ...)
+    plot_resids <- rbind(plot_resids, data.frame(Input = input_values,
+                                                 Error = obs - tmp,
+                                                 q = i))
+  }
+  
+  plot <- ggplot(plot_resids, aes(x = .data$Input, y = .data$Error)) +
+    geom_line() +
+    facet_wrap(vars(.data$q)) +
+    labs(x = input_name) +
+    theme_bw() +
+    theme(legend.position = 'none')
+  return(plot)
+}
+
+
+
+
+
+
 #' Plot pairs of coefficients and/or inputs, potentially coloured by a 3rd variable
 #' 
 #' Takes either output of `Project`, or something like tData (containing inputs and coefficients)
