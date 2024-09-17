@@ -1,58 +1,11 @@
-setwd("~/Dropbox/Exeter/Projects/UQ4Covid/CountBasis_paper")
-source('code/1_ProcessData.R') # also loads in 0_CountBasis.R
+source('applications/UQ4Covid/1_ProcessData.R') # also loads in 0_CountBasis.R
+setwd('applications/UQ4Covid')
 
-# Plots for particular training/validation sets usually consistent with 2_WorkedExamples
-
-#### Correlation between regional, overall totals ####
-# North East is least correlated (on original and log scales), hence when plotting a particular region, will focus on this
-output_total <- aggregate(cbind(cumH, deaths) ~ output + replicate, data = subset(output_LAD, week == 12), sum)
-region_total <- aggregate(cbind(cumH, deaths) ~ output + replicate + region, data = subset(output_LAD, week == 12), sum)
-regs <- unique(region_total$region)
-for (rr in regs){
-  print(c(rr, cor(output_total$deaths, subset(region_total, region == rr)$deaths)))
-}
-for (rr in regs){
-  print(c(rr, cor(log(output_total$deaths+1), log(subset(region_total, region == rr)$deaths+1))))
-}
-
-#### Correlation between true data, emulator samples ####
-# Not the best measure, particularly for lower values - output is non-linear
-# val_data_LAD <- readRDS("data/val_data_LAD.rds") # validation data
-# val_het_LAD <- readRDS("data/val_het_LAD.rds") # emulator samples for validation set
-# lads <- val_data_LAD$location
-
-# Select 2 LADs
-# i <- 50; j <- 100
-# total1 <- subset(output_LAD, week == 12 & LAD19CD == lads[i])
-# total2 <- subset(output_LAD, week == 12 & LAD19CD == lads[j])
-# cor(total1$deaths, total2$deaths)
-# cor(c(val_het_LAD$samples[i,,]), c(val_het_LAD$samples[j,,]))
-# cor(log(total1$deaths+1), log(total2$deaths+1))
-# cor(c(log(val_het_LAD$samples[i,,]+1)), c(log(val_het_LAD$samples[j,,]+1)))
-# 
-# plot(total1$deaths, total2$deaths)
-# plot(c(val_het_LAD$samples[i,,]), c(val_het_LAD$samples[j,,]))
-# plot(c(log(val_het_LAD$samples[i,,]+1)), c(log(val_het_LAD$samples[j,,]+1)))
-
-# Given the latent basis, we can write down correlations between f_i, f_j without needing to sample
-# i.e. corr[f_i, f_j] = cov[f_i, f_j] / sd[f_i]*sd[f_j]
-# For a particular input x
+#### Plotting correlations ####
 basis_deaths <- readRDS('data/basis_deaths_example.rds')
 val_data_LAD <- readRDS("data/val_data_LAD.rds") # validation data
 val_het_LAD <- readRDS("data/val_het_LAD.rds") # emulator samples for validation set
 preds_het_LAD <- readRDS("data/preds_het_LAD.rds") # predictions on latent basis for validation set
-
-# k <- 1
-# z_mean <- as.numeric(basis_deaths$EnsembleMean + basis_deaths$LatentMean + basis_deaths$tBasis[,1:3] %*% preds_het_LAD$Expectation[k,])
-# z_cov <- basis_deaths$tBasis[,1:3] %*% diag(preds_het_LAD$Variance[k,]) %*% t(basis_deaths$tBasis[,1:3])
-# samps <- rmvnorm(10000, z_mean, z_cov) # 10000x339
-# samps_p <- matrix(rpois(10000*339, exp(samps)), 10000, 339)
-# 
-# cor(samps_p[,1], samps_p[,300]) # sample correlation
-# mm <- as.numeric(exp(z_mean + diag(z_cov)/2))
-# vv <- mm + mm^2 * (exp(diag(z_cov)) - 1)
-# cc <- mm[1]*mm*(exp(z_cov[1,])-1)
-# cc[300] / sqrt(vv[1]*vv[300]) # theoretical correlation
 
 # Select a LAD from each of the 9 regions
 regions <- c('North East', 'North West', 'Yorkshire',
@@ -74,17 +27,13 @@ for (j in 1:9){
   ctrain <- cval <- csample <- csample2 <- numeric(339)
   for (i in 1:339){
     ctrain[i] <- cor(basis_deaths$Data[k[j],], basis_deaths$Data[i,])
-    cval[i] <- cor(val_data_LAD$data[k[j],], val_data_LAD$data[i,])
-    csample[i] <- cor(val_het_LAD$mean[k[j],], val_het_LAD$mean[i,])
-    csample2[i] <- cor(c(val_het_LAD$samples[k[j],,]), c(val_het_LAD$samples[i,,]))
+    csample[i] <- cor(c(val_het_LAD$samples[k[j],,]), c(val_het_LAD$samples[i,,]))
   }
   inds <- order(-ctrain)
   plot_data <- rbind(plot_data, data.frame(k = regions[j],
                                            LAD = 1:339,
                                            Training = ctrain[inds],
-                                           Emulator = csample2[inds]))
-                                           #Val = cval[inds],
-                                           #Sample = csample[inds],
+                                           Emulator = csample[inds]))
 }
 plot_data$k <- factor(plot_data$k, levels = regions)
 plot_data <- melt(plot_data, id.vars = c('LAD', 'k'))
