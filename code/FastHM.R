@@ -10,6 +10,7 @@
 #' @param Variance a matrix containing emulator variances, where a given row contains the variances for the q emulated basis vectors, for some x
 #' @param Error observation error variance matrix
 #' @param Disc discrepancy variance matrix
+#' @param PartialObs If the observation vector is a subset of the full output, selects required indices from full output that correspond to observations. Defaults to NULL (all outputs observed)
 #' @param weightinv if not NULL, the inverse of W = var_err + var_disc, used for projection
 #' #' 
 #' @return \item{impl}{Vector of implausibilities corresponding to the rows of Expectation and Variance}
@@ -18,11 +19,24 @@
 #' \item{inNROY}{Vector indicating whether a parameter setting is ruled out}
 #'
 #' @export
-HistoryMatch <- function(DataBasis, Obs, Expectation, Variance, Error, Disc, weightinv = NULL, BasisUncertainty = TRUE){
+HistoryMatch <- function(DataBasis, Obs, Expectation, Variance, Error, Disc, PartialObs = NULL, weightinv = NULL, BasisUncertainty = TRUE){
   q <- dim(Expectation)[2]
   Basis <- DataBasis$tBasis[,1:q]
   l <- dim(Basis)[1]
   stopifnot(q == dim(Variance)[2])
+  
+  # If a subset is not selected, assumes we use all outputs
+  if (is.null(PartialObs)){
+    obs_inds <- 1:l
+  }
+  
+  else {
+    obs_inds <- PartialObs
+  }
+  
+  # Check that Obs and PartialObs are consistent
+  stopifnot(length(Obs) == length(obs_inds))
+  
   W <- Error + Disc
   if (is.null(weightinv)){
     weightinv <- GetInverse(W)
@@ -37,7 +51,7 @@ HistoryMatch <- function(DataBasis, Obs, Expectation, Variance, Error, Disc, wei
     else {
       BasisVar <- DiscardedBasisVariance(DataBasis, q, weightinv = DataBasis$Winv)
     }
-    W <- W + BasisVar
+    W <- W + BasisVar[obs_inds,obs_inds] # basis variance exists over full output, but if we've got partial obs, only need these rows/columns
     weightinv <- GetInverse(W) # need to re-define W^-1 to include this extra variance, to enable fast calculation of full I(x)
   }
   
@@ -58,14 +72,14 @@ HistoryMatch <- function(DataBasis, Obs, Expectation, Variance, Error, Disc, wei
   #   Variance <- cbind(Variance, matrix(rep(EstVar, each = nn), nn, ncol(Basis) - q))
   # }
 
-  R_W <- ReconError(Obs, Basis, weightinv = weightinv, scale = FALSE)
+  R_W <- ReconError(Obs, Basis[obs_inds,], weightinv = weightinv, scale = FALSE)
   # Project observations onto basis if required
-  if (length(Obs) == l){
-    ObsProj <- Project(Obs, Basis, weightinv = weightinv)
+  if (length(Obs) == length(obs_inds)){
+    ObsProj <- Project(Obs, Basis[obs_inds,], weightinv = weightinv)
   }
   # Project variance matrices onto basis if required
-  if (dim(Disc)[1] == l){
-    WProj <- VarProj(W, Basis, weightinv = weightinv)
+  if (dim(Disc)[1] == length(obs_inds)){
+    WProj <- VarProj(W, Basis[obs_inds,], weightinv = weightinv)
   }
   impl <- as.numeric(parallel::mclapply(1:nn, function(i) ImplCoeff(Expectation[i,], Variance[i,], ObsProj, WProj, 0*WProj)))
   impl <- impl + rep(R_W, nn) 
