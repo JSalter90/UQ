@@ -67,7 +67,7 @@ HistoryMatch <- function(DataBasis, Obs, Expectation, Variance, Error, Disc, wei
   if (dim(Disc)[1] == l){
     WProj <- VarProj(W, Basis, weightinv = weightinv)
   }
-  impl <- as.numeric(mclapply(1:nn, function(i) ImplCoeff(Expectation[i,], Variance[i,], ObsProj, WProj, 0*WProj)))
+  impl <- as.numeric(parallel::mclapply(1:nn, function(i) ImplCoeff(Expectation[i,], Variance[i,], ObsProj, WProj, 0*WProj)))
   impl <- impl + rep(R_W, nn) 
   bound <- qchisq(0.995, l)
   nroy <- sum(impl < bound)/nn
