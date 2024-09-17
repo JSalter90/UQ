@@ -83,7 +83,7 @@ HistoryMatch <- function(DataBasis, Obs, Expectation, Variance, Error, Disc, Par
   }
   impl <- as.numeric(parallel::mclapply(1:nn, function(i) ImplCoeff(Expectation[i,], Variance[i,], ObsProj, WProj, 0*WProj)))
   impl <- impl + rep(R_W, nn) 
-  bound <- qchisq(0.995, l)
+  bound <- qchisq(0.995, length(obs_inds))
   nroy <- sum(impl < bound)/nn
   inNROY <- impl < bound
   return(list(impl = impl, bound = bound, nroy = nroy, inNROY = inNROY))
