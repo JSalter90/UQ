@@ -715,3 +715,46 @@ ValidateGasp <- Validate
 
 
 
+
+
+#' Pairs plot of NROY space
+#'
+#' @param Design Data frame of inputs, possibly with a TRUE/FALSE final column named `NROY`.
+#' @param k Indices relating to which columns of `Design` to plot. If NULL, plots all.
+#' @param NROY Vector of TRUE/FALSE labels, corresponding to classification of `Design`. If NULL, uses the final column of `Design`.
+#' @param Truth NOT YET ADDED
+#' @param size Controlling size of points on lower half of plot
+#'
+#' @return
+#' @export
+#'
+#' @examples
+PlotNROY <- function(Design, k = NULL, NROY = NULL, Truth = NULL, size = 0.5){
+  # If a vector of NROY labels is not provided, assume this is the final column of Design
+  if (is.null(NROY)){
+    colnames(Design)[ncol(Design)] <- 'NROY'
+  }
+  
+  else {
+    Design <- data.frame(Design, NROY = NROY)
+  }
+  
+  if (is.null(k)){
+    k <- 1:(ncol(Design)-1)
+  }
+  
+  plot <- GGally::ggpairs(Design, columns = k, aes(col = NROY), 
+                          upper = list(continuous = GGally::wrap("density", alpha = 0.5), combo = "box_no_facet"),
+                          lower = list(continuous = GGally::wrap("points", alpha = 0.3, size = size), combo = GGally::wrap("dot_no_facet", alpha = 0.4)),
+                          diag = list(continuous = GGally::wrap("densityDiag", alpha = 0.3)), 
+                          legend = 1) +
+    theme_bw() +
+    theme(legend.position = "bottom") + 
+    scale_colour_manual(values = my.cols[-1]) +
+    scale_fill_manual(values = my.cols[-1])
+  
+  return(plot)
+}
+
+
+
