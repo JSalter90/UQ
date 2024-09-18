@@ -22,12 +22,12 @@
 HistoryMatch <- function(DataBasis, Obs, Expectation, Variance, Error, Disc, PartialObs = NULL, weightinv = NULL, BasisUncertainty = TRUE){
   q <- dim(Expectation)[2]
   Basis <- DataBasis$tBasis[,1:q]
-  l <- dim(Basis)[1]
+  ell <- dim(Basis)[1]
   stopifnot(q == dim(Variance)[2])
   
   # If a subset is not selected, assumes we use all outputs
   if (is.null(PartialObs)){
-    obs_inds <- 1:l
+    obs_inds <- 1:ell
   }
   
   else {
@@ -126,8 +126,8 @@ ImplCoeff <- function(Expectation, Variance, Obs, Error, Disc){
 #' @export
 SetDiscrepancy <- function(tBasis, q, obs, level = 0.95, weightinv = NULL){
   TruncatedError <- ReconError(obs, tBasis[,1:q], weightinv = weightinv, scale = FALSE)
-  l <- dim(tBasis)[1]
-  b <- qchisq(level, l)
+  ell <- dim(tBasis)[1]
+  b <- qchisq(level, ell)
   DiscMultiplier <- c(TruncatedError / b)
   return(DiscMultiplier)
 }
