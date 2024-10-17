@@ -27,19 +27,19 @@ CountBasis <- function(data, ...){
   pln_basis <- PLNmodels::PLNPCA(Abundance ~ 1, data  = data_fit, ...)
   t2 <- Sys.time()
   print(t2 - t1)
-
+  
   best <- PLNmodels::getBestModel(pln_basis)
-
+  
   # Format in standard way, but also store raw outputs
   EnsembleMean <- as.numeric(coef(best)) # not quite the ensemble mean, but similar
   Coeffs <- best$scores
   tBasis <- best$rotation
   LatentMean <- as.numeric(apply(best$latent_pos, 2, mean)) # the latent part (relative to ens mean) is not necessarily mean zero
   Data <- data
-
+  
   # Relabel coefficient columns
   colnames(Coeffs)[1:ncol(Coeffs)] <- paste("C",1:ncol(Coeffs),sep="")
-
+  
   return(list(tBasis = tBasis,
               Data = Data,
               EnsembleMean = EnsembleMean,
@@ -114,7 +114,7 @@ BuildHet <- function(Response, tData, training_prop = 0.75, ...){
   lastCand <- which(names(tData)=="Noise")
   n <- dim(tData)[1]
   ind_response <- which(names(tData) == Response)
-
+  
   # Split into training and validation data randomly
   if (training_prop < 1){
     n_t <- ceiling(training_prop * n)
@@ -124,7 +124,7 @@ BuildHet <- function(Response, tData, training_prop = 0.75, ...){
     validation_input <- tData[-inds_t, 1:(lastCand-1)]
     validation_response <- tData[-inds_t, ind_response]
   }
-
+  
   else {
     n_t <- n
     train_input <- tData[, 1:(lastCand-1)]
@@ -132,21 +132,21 @@ BuildHet <- function(Response, tData, training_prop = 0.75, ...){
     validation_input <- NULL
     validation_response <- NULL
   }
-
+  
   # For hetGP, need to process tData to handle replicates
   het_input <- hetGP::find_reps(X = as.matrix(train_input), Z = train_response)
-
+  
   # Fit emulator
   em <- hetGP::mleHetGP(X = list(X0 = het_input$X0, Z0 = het_input$Z0, mult = het_input$mult),
                         Z = het_input$Z, covtype = 'Matern3_2', ...)
-
+  
   train_data <- cbind(train_input, train_response)
   colnames(train_data)[dim(train_data)[2]] <- Response
   validation_data <- cbind(validation_input, validation_response)
   if (training_prop < 1){
     colnames(validation_data)[dim(train_data)[2]] <- Response
   }
-
+  
   return(list(em = em,
               type = 'het',
               train_data = train_data,
@@ -187,7 +187,7 @@ PredictHet <- function(Design, emulator){
 #'
 #' @export
 ValidateHet <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
-
+  
   if (!is.null(ValidationData)){
     emulator$validation_data <- ValidationData[,colnames(emulator$train_data)]
   }
@@ -199,25 +199,25 @@ ValidateHet <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
   }
   response <- emulator$validation_data[,resp_ind]
   preds <- PredictHet(design, emulator)
-
+  
   vars <- preds$sd2 + preds$nugs
   preds$lower95 <- preds$mean - 1.96*sqrt(vars)
   preds$upper95 <- preds$mean + 1.96*sqrt(vars)
   upp <- max(c(preds$upper95, response))
   low <- min(c(preds$lower95, response))
   preds$truth <- response
-
+  
   preds$sd2var <- preds$cov <- NULL
-
+  
   preds$In95 <- preds$truth >= preds$lower95 & preds$truth <= preds$upper95
   perc_outside <- round(sum(preds$In95 == FALSE) / length(preds$In95) * 100, 1)
   cols <- c('darkgrey', viridis::viridis(100)[31], viridis::viridis(100)[81])
-
+  
   # Ensuring good points still coloured green if no points outside
   if (perc_outside == 0){
     cols[2:3] <- viridis::viridis(100)[81]
   }
-
+  
   plots <- ggplot(as.data.frame(preds), aes(x = .data$truth, y = .data$mean, col = .data$In95)) +
     geom_errorbar(aes(ymin = .data$lower95, ymax = .data$upper95), col = cols[1]) +
     geom_point() +
@@ -225,7 +225,7 @@ ValidateHet <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
     geom_abline(slope = 1, alpha = 0.6) +
     labs(y = 'Prediction', x = 'Truth', title = paste0('Outside 95% = ', perc_outside, '%')) +
     theme(legend.position = 'none')
-
+  
   if (IndivPars == TRUE){
     plots_inputs <- NULL
     for (j in 1:dim(design)[2]){
@@ -238,11 +238,11 @@ ValidateHet <- function(emulator, ValidationData = NULL, IndivPars = FALSE){
         theme(legend.position = 'none')
     }
   }
-
+  
   if (IndivPars == FALSE){
     return(plots)
   }
-
+  
   else{
     return(list(plot = plots,
                 input = plots_inputs))
@@ -288,40 +288,40 @@ BasisPredHet <- function(Design, emulators){
 #' @export
 ReconFitted <- function(CountBasis, q = NULL, inds = NULL){
   ell <- nrow(CountBasis$tBasis)
-
+  
   if (is.null(q)){
     q <- ncol(CountBasis$tBasis)
   }
-
+  
   if (is.null(inds)){
     n <- nrow(CountBasis$Coeffs)
     inds <- 1:n
   }
-
+  
   else {
     n <- length(inds)
   }
-
+  
   C <- CountBasis$PLN$models[[1]]$model_par$C[,1:q]
   S2 <- CountBasis$PLN$models[[1]]$var_par$S2[inds,1:q]
-
+  
   var <- matrix(0, ell, n)
-
+  
   if (q > 1){
     for (i in 1:n){
       var[,i] <- diag(C %*% diag(S2[i,]) %*% t(C))
     }
   }
-
+  
   else {
     for (i in 1:n){
       var[,i] <- diag(S2[i] * C %*% t(C))
     }
   }
-
+  
   latent <- CountBasis$EnsembleMean + CountBasis$LatentMean + CountBasis$tBasis[,1:q] %*% t(CountBasis$Coeffs[inds,1:q])
   response <- exp(latent + 0.5*var)
-
+  
   return(response)
 }
 
@@ -341,7 +341,7 @@ ReconFitted <- function(CountBasis, q = NULL, inds = NULL){
 ReconExpectation <- function(Coeffs, Variance, CountBasis){
   q <- length(Coeffs)
   Basis <- CountBasis$tBasis[,1:q]
-
+  
   if (q == 1){
     var <- diag(Variance * Basis %*% t(Basis))
     latent <- CountBasis$EnsembleMean + CountBasis$LatentMean + Basis * c(Coeffs)
@@ -350,7 +350,7 @@ ReconExpectation <- function(Coeffs, Variance, CountBasis){
     var <- diag(Basis %*% diag(Variance) %*% t(Basis))
     latent <- CountBasis$EnsembleMean + CountBasis$LatentMean + Basis %*% c(Coeffs)
   }
-
+  
   response <- exp(latent + 0.5*var)
   return(c(response))
 }
@@ -414,10 +414,10 @@ CountBasisEmSamples <- function(BasisPred, CountBasis, ns = 1000, ReturnAll = FA
     n <- 1
     q <- length(BasisPred$Expectation)
   }
-
+  
   ell <- dim(CountBasis$tBasis)[1]
   Basis <- CountBasis$tBasis[,1:q]
-
+  
   if (BasisUncertainty){
     EstVar <- apply(CountBasis$Coeffs, 2, var)[-c(1:q)] # variance on these vectors
     
@@ -437,7 +437,7 @@ CountBasisEmSamples <- function(BasisPred, CountBasis, ns = 1000, ReturnAll = FA
     
     q <- ncol(Basis)
   }
-
+  
   if (n == 1){
     samp <- matrix(rnorm(q*ns,
                          mean = rep(BasisPred$Expectation),
@@ -445,7 +445,7 @@ CountBasisEmSamples <- function(BasisPred, CountBasis, ns = 1000, ReturnAll = FA
     rec <- CountBasis$EnsembleMean + CountBasis$LatentMean + Basis %*% t(samp)
     em_samp <- matrix(rpois(ell*ns, c(exp(rec))), nrow = ell)
   }
-
+  
   if (n > 1){
     em_samp <- array(0, dim = c(ell, ns, n))
     for (i in 1:n){
@@ -456,26 +456,26 @@ CountBasisEmSamples <- function(BasisPred, CountBasis, ns = 1000, ReturnAll = FA
       em_samp[,,i] <- matrix(rpois(ell*ns, c(exp(rec))), nrow = ell)
     }
   }
-
+  
   if (n == 1){
     samp_mean <- apply(em_samp, 1, mean)
     lower <- apply(em_samp, 1, quantile, probs = 0.025)
     upper <- apply(em_samp, 1, quantile, probs = 0.975)
   }
-
+  
   if (n > 1){
     samp_mean <- apply(em_samp, c(1,3), mean)
     lower <- apply(em_samp, c(1,3), quantile, probs = 0.025)
     upper <- apply(em_samp, c(1,3), quantile, probs = 0.975)
   }
-
+  
   if (ReturnAll){
     return(list(mean = samp_mean,
                 lower = lower,
                 upper = upper,
                 samples = em_samp))
   }
-
+  
   else {
     return(list(mean = samp_mean,
                 lower = lower,
@@ -500,22 +500,22 @@ CountBasisEmSamples <- function(BasisPred, CountBasis, ns = 1000, ReturnAll = FA
 #'
 #' @export
 AggregateSamples <- function(Samples, locs = NULL){
-
+  
   ell <- dim(Samples)[1]
   ns <- dim(Samples)[2]
   # Input will either be ell x ns (i.e. for a single input), or ell x ns x n
   if (is.na(dim(Samples)[3])){
     n <- 1
   }
-
+  
   else {
     n <- dim(Samples)[3]
   }
-
+  
   if (is.null(locs)){
     locs <- 1:ell
   }
-
+  
   # Subset to required locations, and sum
   if (length(locs) == 1){
     if (n == 1){
@@ -531,7 +531,7 @@ AggregateSamples <- function(Samples, locs = NULL){
       upper <- apply(sub_total, 2, quantile, probs = 0.975)
     }
   }
-
+  
   else {
     if (n == 1){
       sub_data <- Samples[locs,]
@@ -540,7 +540,7 @@ AggregateSamples <- function(Samples, locs = NULL){
       mu <- mean(sub_total)
       upper <- quantile(sub_total, probs = 0.975)
     }
-
+    
     else {
       sub_data <- Samples[locs,,]
       sub_total <- apply(sub_data, c(2,3), sum)
@@ -549,7 +549,7 @@ AggregateSamples <- function(Samples, locs = NULL){
       upper <- apply(sub_total, 2, quantile, probs = 0.975)
     }
   }
-
+  
   return(list(mean = mu,
               lower = lower,
               upper = upper,
@@ -574,9 +574,9 @@ ValidateSum <- function(Samples, Truth, locs = NULL){
   if (is.null(locs)){
     locs <- 1:ell
   }
-
+  
   EmSum <- AggregateSamples(Samples, locs)
-
+  
   if (!(nrow(Truth) == length(locs))){
     Truth <- Truth[locs,]
   }
@@ -593,11 +593,11 @@ ValidateSum <- function(Samples, Truth, locs = NULL){
                           Lower = EmSum$lower,
                           Upper = EmSum$upper,
                           Truth = TruthSum)
-
+  
   plot_data$In95 <- plot_data$Truth >= plot_data$Lower & plot_data$Truth <= plot_data$Upper
   perc_outside <- round(sum(plot_data$In95 == FALSE) / length(plot_data$In95) * 100, 1)
   cols <- c('darkgrey', viridis::viridis(100)[31], viridis::viridis(100)[81])
-
+  
   # Ensuring good points still coloured green if no points outside
   if (perc_outside == 0){
     cols[2:3] <- viridis::viridis(100)[81]
@@ -619,7 +619,7 @@ ValidateSum <- function(Samples, Truth, locs = NULL){
     labs(y = 'Prediction', title = paste0('Outside 95% = ', perc_outside, '%')) +
     theme_bw() +
     theme(legend.position = 'none')
-
+  
   return(plot)
 }
 
@@ -846,11 +846,11 @@ PlotMean <- function(CountBasis, coords = NULL){
                             Latitude = coords[,2],
                             Mean = CountBasis$EnsembleMean)
   }
-
+  
   plot <- ggplot(plot_data, aes(.data$Longitude, .data$Latitude, col = .data$Mean)) +
     geom_point(size = 3) +
     viridis::scale_colour_viridis()
-
+  
   return(plot)
 }
 
@@ -875,13 +875,13 @@ PlotBasis <- function(CountBasis, q = 9, coords = NULL){
   }
   
   point_size <- ifelse(ell >= 1000, 0.25, 0.75)
-
+  
   plot <- ggplot(plot_data, aes(.data$Longitude, .data$Latitude, col = .data$Weight)) +
     geom_point(size = point_size) +
     facet_wrap(vars(.data$Vector)) +
     viridis::scale_colour_viridis() +
     theme_bw()
-
+  
   return(plot)
 }
 
@@ -899,26 +899,26 @@ PlotBasis <- function(CountBasis, q = 9, coords = NULL){
 #'
 #' @export
 PlotReconCount <- function(CountBasis, q = 1, inds = 1:16, coords = NULL){
-
+  
   ell <- nrow(CountBasis$tBasis)
   basis <- CountBasis$tBasis[,1:q]
   recons <- ReconFitted(CountBasis, q, inds)
   truth <- CountBasis$Data[,inds]
-
+  
   if (!(is.null(coords))){
     plot_data <- data.frame(Longitude = coords[,1],
                             Latitude = coords[,2],
                             Residual = c(truth - recons),
                             Run = rep(inds, each = ell))
   }
-
+  
   lim <- max(abs(plot_data$Residual))
-
+  
   plot <- ggplot(plot_data, aes(.data$Longitude, .data$Latitude, col = .data$Residual)) +
     geom_point() +
     facet_wrap(vars(.data$Run)) +
     scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red', limits = c(-lim, lim))
-
+  
   return(plot)
 }
 
@@ -935,31 +935,31 @@ PlotReconCount <- function(CountBasis, q = 1, inds = 1:16, coords = NULL){
 #'
 #' @export
 PlotCoeffs <- function(CountBasis, k = 1, run_ids, plot_inds = NULL){
-
+  
   # In case not provided with these column names
   colnames(run_ids) <- c('output', 'replicate')
-
+  
   # Extract ids of replicated runs
   rep_ids <- unique(run_ids$output[which(run_ids$replicate > 1)])
-
+  
   if (is.null(plot_inds)){
     plot_inds <- 1:length(rep_ids)
   }
   
   # Extract which rows correspond to replicates of these inputs
   inds <- which(run_ids$output %in% rep_ids[plot_inds])
-
+  
   # Combine required coefficients with 'output'
   plot_data <- data.frame(Coefficient = CountBasis$Coeffs[inds,k],
                           Run = run_ids$output[inds])
-
+  
   plot <- ggplot(plot_data, aes(x = .data$Coefficient, y = as.factor(.data$Run))) +
     geom_boxplot(fill = 'grey') +
     labs(x = paste0('c', k), y = '') +
     geom_vline(xintercept = 0, linetype = 'dotted') +
     theme_bw() +
     theme(legend.position = "none")
-
+  
   return(plot)
 }
 
@@ -971,12 +971,13 @@ PlotCoeffs <- function(CountBasis, k = 1, run_ids, plot_inds = NULL){
 #' @param Samples A set of samples from the PLNPCA emulator, reconstructed to the original field. Usually the `$samples` field of `CountBasisEmSamples()`
 #' @param locs Indices of locations (across the output field) to aggregate over. Defaults to NULL, which uses all outputs
 #' @param runs Which runs to plot
+#' @param samp_inds Which samples to plot
 #' @param Truth The true output, if available
 #'
 #' @return A plot of reconstructed emulator samples, for the given runs/locations, with the true output overlaid if provided
 #'
 #' @export
-PlotSamplesCount <- function(Samples, locs = NULL, runs = NULL, Truth = NULL){
+PlotSamplesCount <- function(Samples, locs = NULL, runs = NULL, samp_inds = NULL, Truth = NULL){
   ell <- dim(Samples)[1]
   ns <- dim(Samples)[2]
   # Input will either be ell x ns (i.e. for a single input), or ell x ns x n
@@ -986,40 +987,54 @@ PlotSamplesCount <- function(Samples, locs = NULL, runs = NULL, Truth = NULL){
   else {
     n <- dim(Samples)[3]
   }
-
+  
   # If don't provide a subset to plot, use all
   if (is.null(locs)){
     locs <- 1:ell
   }
-
+  
   # If don't provide which runs to plot, use all
   if (is.null(runs)){
     runs <- 1:n
   }
-
+  
+  # If don't provide which samples to plot, use all
+  if (is.null(samp_inds)){
+    samp_inds <- 1:ns
+  }
+  
   # Subset to required locations
   if (n == 1){
     Samples <- Samples[locs,]
   }
-
+  
   else {
     Samples <- Samples[locs,,runs]
   }
-
+  
   plot_data <- data.frame(Input = 1:length(locs),
                           Output = c(Samples),
                           s = rep(1:ns, each = length(locs)),
                           Run = rep(runs, each = length(locs)*ns))
-
+  
+  # Calculate mean/95% from all samples
+  plot_mean <- data.frame(aggregate(Output ~ Input + Run, plot_data, mean))
+  plot_lower <- data.frame(aggregate(Output ~ Input + Run, plot_data, quantile, probs = 0.025))
+  plot_upper <- data.frame(aggregate(Output ~ Input + Run, plot_data, quantile, probs = 0.975))
+  
+  # Convert 0s to 0.1 for plotting on log scale
+  plot_data$Output[plot_data$Output == 0] <- 0.1
+  plot_mean$Output[plot_mean$Output <= 0.1] <- 0.1
+  plot_lower$Output[plot_lower$Output <= 0.1] <- 0.1
+  plot_upper$Output[plot_upper$Output <= 0.1] <- 0.1
+  
   line_size <- ifelse(length(runs) >= 9 | length(locs) > 50, 0.75, 1)
   
-  plot_data$Output[plot_data$Output == 0] <- 0.1
-  
-  plot <- ggplot(plot_data, aes(.data$Input, .data$Output, col = as.factor(.data$s))) +
-    geom_line() +
-    geom_line(data = data.frame(aggregate(Output ~ Input + Run, plot_data, mean)), col = 'red', size = line_size) +
-    geom_line(data = data.frame(aggregate(Output ~ Input + Run, plot_data, quantile, probs = 0.025)), col = 'red', size = line_size, linetype = 'dashed') +
-    geom_line(data = data.frame(aggregate(Output ~ Input + Run, plot_data, quantile, probs = 0.975)), col = 'red', size = line_size, linetype = 'dashed') +
+  plot <- ggplot(subset(plot_data, s %in% samp_inds), aes(.data$Input, .data$Output, col = as.factor(.data$s))) +
+    geom_line(size = 0.25) +
+    geom_line(data = plot_mean, col = 'red', size = line_size) +
+    geom_line(data = plot_lower, col = 'red', size = line_size, linetype = 'dashed') +
+    geom_line(data = plot_upper, col = 'red', size = line_size, linetype = 'dashed') +
     scale_colour_manual(values = rep('grey', max(plot_data$s))) +
     facet_wrap(vars(.data$Run)) +
     scale_y_log10(breaks = c(0.1,1,10,100,1000,10000,100000), labels = c('0','1','10','100','1000','10000','100000')) +
@@ -1029,7 +1044,7 @@ PlotSamplesCount <- function(Samples, locs = NULL, runs = NULL, Truth = NULL){
   if (length(locs)<=15){
     plot <- plot + scale_x_continuous(breaks=1:length(locs))
   }
-
+  
   # If provided with true output to overlay
   if (!(is.null(Truth))){
     truth_data <- data.frame(Input = 1:length(locs),
@@ -1039,7 +1054,7 @@ PlotSamplesCount <- function(Samples, locs = NULL, runs = NULL, Truth = NULL){
     plot <- plot +
       geom_line(data = truth_data, col = 'black', size = line_size)
   }
-
+  
   return(plot)
 }
 
@@ -1051,40 +1066,56 @@ PlotSamplesCount <- function(Samples, locs = NULL, runs = NULL, Truth = NULL){
 #' @param Samples A set of samples from the PLNPCA emulator, reconstructed to the original field. Usually the `$samples` field of `CountBasisEmSamples()`
 #' @param Replicates The true replicates
 #' @param locs Indices of locations (across the output field) to aggregate over. Defaults to NULL, which uses all outputs
-#'
+#' @param samp_inds Which samples to plot
+#' 
 #' @return A plot of the emulator samples, with true replicates overlaid
 #'
 #' @export
-PlotReplicates <- function(Samples, Replicates, locs = NULL){
+PlotReplicates <- function(Samples, Replicates, locs = NULL, samp_inds = NULL){
   ell <- dim(Samples)[1]
   ns <- dim(Samples)[2]
   r <- ncol(Replicates)
-
+  
   if (is.null(locs)){
     locs <- 1:ell
   }
-
+  
+  if (is.null(samp_inds)){
+    samp_inds <- 1:ns
+  }
+  
   # Subsetting to chosen locations
   Samples <- Samples[locs,]
   Replicates <- Replicates[locs,]
-
+  
   plot_data <- data.frame(Input = 1:length(locs),
                           Output = c(Samples),
                           s = rep(1:ns, each = length(locs)))
+  
+  # Calculate mean/95% from all samples
+  plot_mean <- data.frame(aggregate(Output ~ Input, plot_data, mean))
+  plot_lower <- data.frame(aggregate(Output ~ Input, plot_data, quantile, probs = 0.025))
+  plot_upper <- data.frame(aggregate(Output ~ Input, plot_data, quantile, probs = 0.975))
+  
+  # Convert 0s to 0.1 for plotting on log scale
   plot_data$Output[plot_data$Output == 0] <- 0.1
+  plot_mean$Output[plot_mean$Output <= 0.1] <- 0.1
+  plot_lower$Output[plot_lower$Output <= 0.1] <- 0.1
+  plot_upper$Output[plot_upper$Output <= 0.1] <- 0.1
   
   rep_data <- data.frame(Input = 1:length(locs),
                          Output = c(Replicates),
                          s = rep(ns + (1:r), each = length(locs)))
+  
   rep_data$Output[rep_data$Output == 0] <- 0.1
-
-  plot <- ggplot(plot_data, aes(.data$Input, .data$Output, col = as.factor(.data$s))) +
-    geom_line() +
+  
+  plot <- ggplot(subset(plot_data, s %in% samp_inds), aes(.data$Input, .data$Output, col = as.factor(.data$s))) +
+    geom_line(size = 0.25) +
     geom_line(data = rep_data, aes(.data$Input, .data$Output, linetype = as.factor(.data$s)), size = 0.5, col = 'black') +
     scale_linetype_manual(values = rep(1, r)) +
-    geom_line(data = data.frame(aggregate(Output ~ Input, plot_data, mean)), col = 'red', size = 1) +
-    geom_line(data = data.frame(aggregate(Output ~ Input, plot_data, quantile, probs = 0.025)), col = 'red', size = 1, linetype = 'dashed') +
-    geom_line(data = data.frame(aggregate(Output ~ Input, plot_data, quantile, probs = 0.975)), col = 'red', size = 1, linetype = 'dashed') +
+    geom_line(data = plot_mean, col = 'red', size = 1) +
+    geom_line(data = plot_lower, col = 'red', size = 1, linetype = 'dashed') +
+    geom_line(data = plot_upper, col = 'red', size = 1, linetype = 'dashed') +
     scale_colour_manual(values = rep('grey', max(plot_data$s))) +
     scale_y_log10(breaks = c(0.1,1,10,100,1000,10000,100000), labels = c('0','1','10','100','1000','10000','100000')) +
     theme_bw() +
@@ -1093,6 +1124,6 @@ PlotReplicates <- function(Samples, Replicates, locs = NULL){
   if (length(locs)<=15){
     plot <- plot + scale_x_continuous(breaks=1:length(locs))
   }
-
+  
   return(plot)
 }
