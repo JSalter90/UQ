@@ -5,7 +5,6 @@ source('applications/UQ4Covid/1_ProcessData.R') # also loads in 0_CountBasis.R
 # Summaries of all emulators x experiments stored in results_all.rds, results_ward.rds, which are stored on GitHub
 
 # Summarising results
-library(dplyr)
 results_LAD <- readRDS('applications/UQ4Covid/data/results_LAD.rds')
 results_ward <- readRDS('applications/UQ4Covid/data/results_ward.rds')
 results_ward$Region <- as.factor(results_ward$Region)
