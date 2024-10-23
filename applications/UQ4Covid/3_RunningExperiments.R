@@ -12,21 +12,8 @@ experiments <- data.frame(n = rep(c(100,150,200), each = 50),
                           seed = sample(1:10^6, 150))
 
 # Count basis, no reps
-# This code will loop over all combinations of (n, seed) in experiments, and fit the chosen emulators
+# This code will loop over all combinations of (n, seed) in experiments, fit the chosen emulators, and write samples
 FitMulti(path = 'data/samples_final_LAD/PLNPCA', experiments, design_em, week12_data,
-         basis = 'PLNPCA', 
-         hetGP = TRUE,
-         standardGP = TRUE,
-         reps = FALSE)
-
-# Some fail initially - re-run those without output
-failed <- numeric(nrow(experiments))
-for (i in 1:length(failed)){
-  failed[i] <- length(list.files('data/samples_final_LAD/PLNPCA', pattern = paste0(experiments$seed[i]))) == 0
-}
-failed 
-
-FitMulti(path = 'data/samples_final_LAD/PLNPCA', experiments[which(failed==1),], design_em, week12_data,
          basis = 'PLNPCA', 
          hetGP = TRUE,
          standardGP = TRUE,
@@ -34,19 +21,6 @@ FitMulti(path = 'data/samples_final_LAD/PLNPCA', experiments[which(failed==1),],
 
 # SVD basis, no reps
 FitMulti(path = 'data/samples_final_LAD/SVD', experiments, design_em, week12_data,
-         basis = 'SVD',
-         hetGP = TRUE,
-         standardGP = TRUE,
-         reps = FALSE)
-
-# Some fail initially - re-run those without output
-failed <- numeric(nrow(experiments))
-for (i in 1:length(failed)){
-  failed[i] <- length(list.files('data/samples_final_LAD/SVD', pattern = paste0(experiments$seed[i]))) == 0
-}
-failed 
-
-FitMulti(path = 'data/samples_final_LAD/SVD', experiments[which(failed==1),], design_em, week12_data,
          basis = 'SVD',
          hetGP = TRUE,
          standardGP = TRUE,
@@ -70,7 +44,6 @@ for (rr in regs){
 
 # Ward level
 # Large files - ensure have enough storage
-setwd("/Volumes/Extreme_SSD/data/CountBasis")
 # Count basis, no reps
 FitMulti(path = 'data/samples_final_ward/PLNPCA', experiments, design_em, output_ward,
          id = 'ward',
@@ -79,17 +52,5 @@ FitMulti(path = 'data/samples_final_ward/PLNPCA', experiments, design_em, output
          standardGP = TRUE,
          reps = FALSE)
 
-# Some fail initially - re-run those without output
-failed <- numeric(nrow(experiments))
-for (i in 1:length(failed)){
-  failed[i] <- length(list.files('data/samples_final_ward/PLNPCA', pattern = paste0(experiments$seed[i]))) == 0
-}
-failed 
-sum(failed)
-
-FitMulti(path = 'data/samples_final_ward/PLNPCA', experiments[which(failed==1),], design_em, output_ward,
-         id = 'ward',
-         basis = 'PLNPCA', 
-         hetGP = TRUE,
-         standardGP = TRUE,
-         reps = FALSE)
+# For ward level output, particularly when smaller amount of training data, some wards with generally very low counts end up with large weights, resulting in very large sampled values
+# Sometimes fixed by re-training, sometimes removing 1 or 2 of these wards fixes everything
