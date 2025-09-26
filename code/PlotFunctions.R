@@ -148,6 +148,44 @@ PlotSamples <- function(Samples, inds = NULL, Truth = NULL, input_values = NULL,
 
 
 
+#' Wrapper to do PlotSamples across different outputs instead of different inputs for same output
+#'
+#' @param Samples 
+#' @param Truth 
+#' @param panel_names 
+#' @param panel_ranges 
+#' @param input_values 
+#' @param ... 
+#' 
+#' @return 
+#' 
+#' @export
+PlotSamplesMultiOutput <- function(Samples, Truth = NULL, panel_names = NULL, panel_ranges = NULL, input_values = NULL, ...){
+  
+  plot <- PlotSamples(Samples, Truth = Truth, input_values = input_values, ...)
+  
+  if (!(is.null(panel_names))){
+    names(panel_names) <- 1:length(panel_names)
+    plot <- plot + facet_wrap(vars(Run), scale = 'free_y', labeller = labeller(Run = panel_names))
+  }
+  
+  if (!(is.null(panel_ranges))){
+    panel_order <- match(panel_names, panel_ranges$Tag)
+    panel_ranges <- data.frame(Input = input_values[1],
+                               Output = c(panel_ranges$Min[panel_order], panel_ranges$Max[panel_order]),
+                               Run = 1:length(panel_names),
+                               s = NA)
+    plot <- plot + geom_blank(data = panel_ranges)
+  }
+  
+  return(plot)
+}
+
+
+
+
+
+
 #' Projects and reconstructs runs
 #'
 #' @param DataBasis 
@@ -712,6 +750,72 @@ ValidateGasp <- Validate
 #     }
 #   }
 # }
+
+
+#' Validating predictions based on aggregations
+#'
+#' For a set of samples, and chosen output indices/locations, compares the emulator expectation and variance for this subset to the true values
+#'
+#' @param Samples A set of samples from the basis emulator, reconstructed to the original field. Usually the output of `BasisEmSamples()`
+#' @param Truth The corresponding true model outputs, for comparison. Must have an ordering of rows and columns consistent with `Samples` (in terms of input and output locations)
+#' @param locs Indices of locations (across the output field) to average over. Defaults to NULL, which uses all outputs
+#'
+#' @return Validation plot comparing truth and emulator samples
+#'
+#' @export
+ValidateSummary <- function(Samples, Truth, locs = NULL){
+  ell <- dim(Samples)[1]
+  ns <- dim(Samples)[2]
+  if (is.null(locs)){
+    locs <- 1:ell
+  }
+  
+  # Find average across locs for each sample, run
+  SamplesSummary <- apply(Samples[locs,,], c(2,3), mean)
+  
+  # Find mean/95% interval of averages for plotting
+  SamplesMean <- apply(SamplesSummary, 2, mean)
+  SamplesLower <- apply(SamplesSummary, 2, quantile, prob = 0.025)
+  SamplesUpper <- apply(SamplesSummary, 2, quantile, prob = 0.975)
+  
+  if (!(nrow(Truth) == length(locs))){
+    Truth <- Truth[locs,]
+  }
+  
+  if (length(locs) == 1){
+    TruthMean <- Truth
+  }
+  
+  else {
+    TruthMean <- apply(Truth, 2, mean)
+  }
+  
+  plot_data <- data.frame(Mean = SamplesMean,
+                          Lower = SamplesLower,
+                          Upper = SamplesUpper,
+                          Truth = TruthMean)
+  
+  plot_data$In95 <- plot_data$Truth >= plot_data$Lower & plot_data$Truth <= plot_data$Upper
+  perc_outside <- round(sum(plot_data$In95 == FALSE) / length(plot_data$In95) * 100, 1)
+  cols <- c('darkgrey', viridis::viridis(100)[31], viridis::viridis(100)[81])
+  
+  # Ensuring good points still coloured green if no points outside
+  if (perc_outside == 0){
+    cols[2:3] <- viridis::viridis(100)[81]
+  }
+  
+  plot <- ggplot(plot_data, aes(.data$Truth, .data$Mean, col = .data$In95)) +
+    geom_errorbar(aes(ymin = .data$Lower, ymax = .data$Upper), col = cols[1]) +
+    geom_point() +
+    scale_colour_manual(values = c(cols[2:3])) +
+    geom_abline(slope = 1, alpha = 0.6) +
+    labs(y = 'Prediction', title = paste0('Outside 95% = ', perc_outside, '%')) +
+    theme_bw() +
+    theme(legend.position = 'none')
+  
+  return(plot)
+}
+
 
 
 
