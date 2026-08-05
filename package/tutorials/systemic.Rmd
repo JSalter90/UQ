@@ -280,5 +280,5 @@ PlotSamples(DataBasisW2, em_flowW2, design = nroyW3[1,], output_inds = which(Dat
 PlotSamples(DataBasisW2, em_flowW2, design = nroyW3[1:4,], output_inds = which(DataBasisW2$grid$Output == 'Flow5'), Obs = obs_flow)
 ```
 
-Generally predictions from emulator look similar to observations.
+Generally predictions from emulator look similar to observations - which they mostly should be, given we've ruled out those that don't (up to emulator uncertainty).
 

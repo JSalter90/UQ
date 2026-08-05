@@ -101,19 +101,19 @@ By default, we have 100 samples for the 512D field for each of the 25 points we 
 THIS ISN'T REALLY NEEDED, BUT IS WHEN YOU DON'T HAVE THE TRUTH
 
 ```{r, fig.height = 5}
-PlotSamples(DataBasis, emCoeffs, scaled_design, validation_inds = val_inds[1:4], sample_inds = 1:10)
+PlotSamples(DataBasis, emCoeffs, scaled_design, data_inds = val_inds[1:4], sample_inds = 1:10)
 ```
 
 It looks like the prediction is accurate. Zooming in on a single panel:
 
 ```{r}
-PlotSamples(DataBasis, emCoeffs, scaled_design, validation_inds = val_inds[1], sample_inds = 1:10)
+PlotSamples(DataBasis, emCoeffs, scaled_design, data_inds = val_inds[1], sample_inds = 1:10)
 ```
 
 Instead imagine we predicted with only the `C1` emulator:
 
 ```{r}
-PlotSamples(DataBasis, emCoeffs[[1]], scaled_design, validation_inds = val_inds[1], sample_inds = 1:10)
+PlotSamples(DataBasis, emCoeffs[[1]], scaled_design, data_inds = val_inds[1], sample_inds = 1:10)
 ```
 
 We now much better see what this plot tells us. We have the truth + emulator mean and 95\% prediction interval, plus a small number (10) of individual samples added in grey.
@@ -121,19 +121,19 @@ We now much better see what this plot tells us. We have the truth + emulator mea
 The code automatically samples from the discarded basis vectors. If we only emulate `C1`, this variance could be quite large. Plotting without this added as an illustration:
 
 ```{r}
-PlotSamples(DataBasis, emCoeffs[[1]], scaled_design, validation_inds = val_inds[1], sample_inds = 1:10, BasisUncertainty = FALSE)
+PlotSamples(DataBasis, emCoeffs[[1]], scaled_design, data_inds = val_inds[1], sample_inds = 1:10, BasisUncertainty = FALSE)
 ```
 
 In this case, we have a fairly accurate/low variance emulator for `C1`, but unsurprisingly this doesn't represent the true output very well, and if we ignore the remaining variability our emulator is poor. Adding `C2` to our emulator:
 
 ```{r}
-PlotSamples(DataBasis, emCoeffs[1:2], scaled_design, validation_inds = val_inds[1], sample_inds = 1:10, BasisUncertainty = FALSE)
+PlotSamples(DataBasis, emCoeffs[1:2], scaled_design, data_inds = val_inds[1], sample_inds = 1:10, BasisUncertainty = FALSE)
 ```
 
 We're more accurate, but early on the truth sits outside our predictive uncertainty. But adding in variance due to the discarded vectors resolves this:
 
 ```{r}
-PlotSamples(DataBasis, emCoeffs[1:2], scaled_design, validation_inds = val_inds[1], sample_inds = 1:10, BasisUncertainty = TRUE)
+PlotSamples(DataBasis, emCoeffs[1:2], scaled_design, data_inds = val_inds[1], sample_inds = 1:10, BasisUncertainty = TRUE)
 ```
 
 Of course, here this source of uncertainty doesn't seem large when we emulate the first 5 vectors, but this example is a) relatively low-dimensional and b) can explain an predict vast majority of variability. This won't always be true, and it's important to account for any variability from removed vectors, even if it is random noise.
@@ -141,7 +141,7 @@ Of course, here this source of uncertainty doesn't seem large when we emulate th
 We can also plot the reconstructions without the mean added back in, which might drown out other signal:
 
 ```{r, fig.height = 5}
-PlotSamples(DataBasis, emCoeffs, scaled_design, validation_inds = val_inds[5:8], sample_inds = 1:10, AddMean = FALSE)
+PlotSamples(DataBasis, emCoeffs, scaled_design, data_inds = val_inds[5:8], sample_inds = 1:10, AddMean = FALSE)
 ```
 
 
@@ -152,7 +152,7 @@ PlotSamples(DataBasis, emCoeffs, scaled_design, validation_inds = val_inds[5:8],
 Rather than validating on the coefficients, we could reconstruct and compare the mean (or some other summary) between the emulator an the truth (although the value is of course on getting predictions for all outputs, but this can be a nice sense check). For the validation set:
 
 ```{r}
-ValidateSummary(emCoeffs, scaled_design[,1:4], DataBasis, inds = val_inds)
+ValidateSummary(emCoeffs, scaled_design[,1:4], DataBasis, data_inds = val_inds)
 ```
 
 

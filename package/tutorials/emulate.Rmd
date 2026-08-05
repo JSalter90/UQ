@@ -70,7 +70,7 @@ val_inds <- tt$val_inds
 
 If we just apply it to our data above, providing as little as possible:
 
-```{r}
+```{r, results='hide'}
 em_time <- FitEmulators(flow1_time[train_inds,])
 em_coeffs <- FitEmulators(flow1_coeffs[train_inds,])
 ```
@@ -122,7 +122,7 @@ unlist(lapply(1:4, function(k) em_time[[k]]$response))
 (Alternatively, can select the outputs with column indices:)
 
 ```{r, results='hide'}
-em_time <- FitEmulators(flow1_time[train_inds,], input = 1:4, output_inds = 5:8)
+em_time <- FitEmulators(flow1_time[train_inds,], input = 1:4, output_cols = 5:8)
 ```
 
 ```{r}
