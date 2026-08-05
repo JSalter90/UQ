@@ -1,0 +1,280 @@
+---
+title: "Multi-wave HM"
+author: "JS"
+output:
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, cache = TRUE, fig.height = 3)
+```
+
+Disclaimer (5/8/26): this is still WIP, and some functionality may slightly change.
+
+Load in design, data:
+
+```{r, echo = FALSE, include=FALSE}
+source("~/Dropbox/UQ/package/plot.R")
+source("~/Dropbox/UQ/package/basis.R")
+source("~/Dropbox/UQ/package/emulate.R")
+source("~/Dropbox/UQ/package/calibrate.R")
+load("~/Dropbox/UQ/package/data/systemic_data.RData")
+```
+
+Considering the systemic data (7 flow time series, plus max/min pressure, 5 inputs).
+
+Scaling the design to [0,1]:
+
+```{r}
+scaled_design <- ScaleInputs(design_sim, parRanges, c(0,1))
+dim(scaled_design)
+dim(output_flow)
+dim(output_flow) <- c(512*7, 1250)
+dim(output_pressure)
+```
+
+This dataset contains 1250 simulations, with 7 flow outputs each with 512 points, and 2 scalar outputs.
+
+For wave 1, we'll select a subset of 100 points, and then add in others later.
+
+We'll set the 'observations' as the 1250th simulation:
+
+```{r}
+truth <- scaled_design[1250,]
+obs_flow <- output_flow[,1250]
+obs_pressure <- output_pressure[1250,]
+```
+
+Given we have a set of candidate points rather than the ability to select whatever design we like (e.g., using `lhs::maximinLHS` and then simulating the model), we can use functionality from the package to find a space-filling design from the 1249 points (the truth is removed):
+
+```{r}
+set.seed(48219)
+designW1 <- NewDesign(scaled_design[1:1249,], n_new = 100)
+head(designW1$design)
+head(designW1$inds)
+```
+
+Extracting the model output for these 100 points, and plotting:
+
+```{r, fig.height=4}
+indsW1 <- designW1$inds
+designW1 <- designW1$design
+flowW1 <- output_flow[,indsW1]
+pressureW1 <- output_pressure[indsW1,]
+DataBasisW1 <- MakeDataBasis(flowW1)
+# Add labels for inputs
+DataBasisW1$grid <- data.frame(Time = 1:512,
+                               Output = rep(c('Flow1','Flow2','Flow3','Flow4','Flow5','Flow6','Flow7'), each = 512))
+
+# Plotting, with obs overlaid
+PlotData(DataBasisW1, Obs = obs_flow)
+```
+
+Or plotting pressure:
+
+```{r}
+PlotPair(pressureW1, 'max_pressure', 'min_pressure', obs = obs_pressure)
+```
+
+Plotting the leading 4 basis vectors:
+
+```{r, fig.height=4}
+PlotBasis(DataBasisW1, q = 4)
+```
+
+By default, splits into the 7 different outputs, although in reality everything's stacked together into a vector of length 512*7.
+
+
+## Wave 1
+
+First, let's constrain space based on the max and min pressure. Emulating these 2 outputs (using all 100 points as training, and considering LOOs rather than prediction over an out-of-sample set):
+
+```{r}
+data_pressureW1 <- data.frame(designW1, pressureW1)
+em_pressureW1 <- FitEmulators(data_pressureW1, input = 1:5, output = c('max_pressure', 'min_pressure'))
+looW1 <- LeaveOneOut(em_pressureW1, Obs = obs_pressure, by_index = TRUE)
+```
+
+The observations are given by the dashed lines.
+
+If we're satisfied with the emulators, we can now history match. For each output, we'll set the observation error variance as 1/4, so that $\pm2$SD corresponds to $\pm1$ pressure:
+
+```{r}
+set.seed(2819)
+BigDesign <- lhs::randomLHS(5000,5)
+colnames(BigDesign) <- colnames(scaled_design)
+hmW1 <- HistoryMatch(em_pressureW1, BigDesign, Obs = obs_pressure, ObsVar = c(1/4, 1/4))
+hmW1$NROY
+hmW1$Pass_kth
+```
+
+Perhaps surprisingly, `max_pressure` is the stronger constraint at this stage (16\% kept), with 9\% satisfying both constraints. Plotting NROY space:
+
+```{r, fig.height=5}
+PlotNROY(hmW1$Design, Truth = truth)
+```
+
+`alpha` is strongly constrained, and lower values of `f3` have been ruled out, but the other 3 inputs still have fairly uniform densities.
+
+We could now bring in other outputs to attempt to reduce space further, but instead let's perform another wave using only max/min pressure.
+
+## Wave 2
+
+We need to draw a new design from our set of candidate points (where removed those that were already chosen at wave 1):
+
+```{r}
+CandPointsW2 <- scaled_design[1:1249,]
+CandPointsW2 <- CandPointsW2[-indsW1,]
+```
+
+We need to find which of these are in the current NROY space:
+
+```{r}
+hmW1_cand <- HistoryMatch(em_pressureW1, CandPointsW2, Obs = obs_pressure, ObsVar = c(1/4, 1/4))
+hmW1_cand$NROY
+CandPointsW2 <- subset(hmW1_cand$Design, NROY1)
+dim(CandPointsW2)
+```
+
+There's only 111 points in the current NROY space. Let's select 100 of them, and see if we can improve emulation and calibration:
+
+```{r}
+set.seed(48218)
+designW2 <- NewDesign(CandPointsW2, n_new = 100)
+
+indsW2 <- designW2$inds
+designW2 <- designW2$design
+
+# It's a bit convoluted to get to the corresponding, original indices
+indsW2_original <- c(1:1249)[-indsW1][which(hmW1_cand$inNROY)][indsW2]
+
+flowW2 <- output_flow[,indsW2_original]
+pressureW2 <- output_pressure[indsW2_original,]
+```
+
+
+Plotting as before, to see whether we've reduced the ensemble spread:
+
+```{r, fig.height=4}
+DataBasisW2 <- MakeDataBasis(flowW2)
+DataBasisW2$grid <- DataBasisW1$grid
+PlotData(DataBasisW2, Obs = obs_flow)
+```
+
+We've clearly been successful in ruling out simulations far from the observations (wave 2 plotted on same scale as wave 1 to show the reduction towards the observations):
+
+```{r}
+PlotPair(pressureW2, 'max_pressure', 'min_pressure', obs = obs_pressure) +
+  xlim(range(pressureW1$max_pressure)) +
+  ylim(range(pressureW1$min_pressure))
+```
+
+Fitting new emulators:
+
+```{r}
+data_pressureW2 <- data.frame(designW2, pressureW2)
+em_pressureW2 <- FitEmulators(data_pressureW2, input = 1:5, output = c('max_pressure', 'min_pressure'))
+looW2 <- LeaveOneOut(em_pressureW2, Obs = obs_pressure, by_index = TRUE)
+```
+
+(Note different scales on the y axes to previously.)
+
+For HM, we can provide the code with the previous output of `HistoryMatch` as a starting point of samples from NROY (we still have to provide `Obs` etc., as we could emulate different outputs at each wave):
+
+```{r}
+hmW2 <- HistoryMatch(em_pressureW2, Obs = obs_pressure, ObsVar = c(1/4, 1/4), PreviousWave = hmW1)
+hmW2$NROY
+```
+
+So we're now down to 6\% of the original space (from 9\% after wave 1).
+
+```{r}
+hmW2$Pass_kth
+```
+
+We've not been able to rule out much more based on `min_pressure`.
+
+Plotting the updated NROY. We can so in 2 ways, as `hmW2$Design` contains all of the 5000 samples, with indicators for `NROY1` and `NROY2`. Plotting NROY2 relative to the original space:
+
+```{r, fig.height=5}
+PlotNROY(hmW2$Design, k = 1:5, Truth = truth)
+```
+
+Or just considering those that were in NROY at W1:
+
+```{r, fig.height=5}
+PlotNROY(subset(hmW2$Design, NROY1), k = 1:5, Truth = truth)
+```
+
+We've ruled out a bit more, mostly around the edges (lower `fs3`, higher `f3`).
+
+We could keep sampling new points from within NROY and continue to refine the emulators, to see if can reduce space further (not done here as restricting to the 1250 pre-prepared simulations).
+
+## Wave 3: adding flow
+
+Instead, it might turn out that we're restricted things almost as much as is possible based on the pressure: `f2`, `fs2`, and to a lesser extent `fs3`, may not be particularly important for predicting pressure.
+
+Taking the 100 wave 2 runs above, now emulate the flow series:
+
+```{r, fig.height=4}
+PlotBasis(DataBasisW2, q = 4)
+```
+
+Combining the design with coefficients:
+
+```{r}
+data_flowW2 <- GetEmData(designW2, DataBasisW2, q = 6)
+```
+
+It's unclear whether `f2` and `fs2` will be constrained here, e.g., plotting coloured by `C1` there's not a clean pattern, but there may be in higher dimensions, or for other coefficients:
+
+```{r}
+PlotPair(data_flowW2, 'f2', 'fs2', col = 'C1')
+```
+
+Emulating leading 6 coefficients (arbitrarily; really should also consider next few in case):
+
+```{r}
+em_flowW2 <- FitEmulators(data_flowW2, input = 1:5)
+loo_flowW2 <- LeaveOneOut(em_flowW2, by_index = TRUE)
+```
+
+
+Starting from the W2 NROY space:
+
+```{r}
+hmW3 <- HistoryMatch(em_flowW2, DataBasis = DataBasisW2, Obs = obs_flow, ObsVar = 1/4, PreviousWave = hmW2)
+hmW3$NROY
+```
+
+
+```{r, fig.height=5}
+PlotNROY(hmW3$Design, k = 1:5, Truth = truth)
+```
+
+Or just considering those that were in NROY at W1:
+
+```{r, fig.height=5}
+PlotNROY(subset(hmW3$Design, NROY1), k = 1:5, Truth = truth)
+```
+
+Still hasn't had much effect on some of the inputs, but `alpha`, and particularly `f3`, have been constrained even further.
+
+
+## Plotting some samples
+
+Taking some of the samples and evaluating them with the emulator:
+
+```{r, fig.height=5}
+nroyW3 <- subset(hmW3$Design, NROY3)
+PlotSamples(DataBasisW2, em_flowW2, design = nroyW3[1,], Obs = obs_flow)
+PlotSamples(DataBasisW2, em_flowW2, design = nroyW3[1,], output_inds = which(DataBasisW2$grid$Output == 'Flow1'), Obs = obs_flow)
+PlotSamples(DataBasisW2, em_flowW2, design = nroyW3[1,], output_inds = which(DataBasisW2$grid$Output == 'Flow5'), Obs = obs_flow)
+PlotSamples(DataBasisW2, em_flowW2, design = nroyW3[1:4,], output_inds = which(DataBasisW2$grid$Output == 'Flow5'), Obs = obs_flow)
+```
+
+Generally predictions from emulator look similar to observations.
+

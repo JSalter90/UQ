@@ -1,0 +1,267 @@
+---
+title: "Emulation"
+author: "JS"
+output:
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, cache = TRUE, fig.height = 3)
+```
+
+Disclaimer (5/8/26): this is still WIP, and some functionality may slightly change.
+
+Load in design, data:
+
+```{r, echo = FALSE, include=FALSE}
+source("~/Dropbox/UQ/package/plot.R")
+source("~/Dropbox/UQ/package/basis.R")
+source("~/Dropbox/UQ/package/emulate.R")
+source("~/Dropbox/UQ/package/calibrate.R")
+load("~/Dropbox/UQ/package/data/SECRET_data.RData")
+```
+
+Scaling the design to [0,1]:
+
+```{r}
+scaled_design <- ScaleInputs(design[,1:4], parRanges, c(0,1))
+```
+
+We'll create 2 objects to demonstrate emulation. Firstly, calculate the SVD and coefficients:
+
+```{r}
+flow1_basis <- MakeDataBasis(flow1_data)
+flow1_basis$grid <- data.frame(Time = seq(from=0,by = 0.01, len = 512))
+flow1_coeffs <- GetEmData(scaled_design, flow1_basis, q = 5)
+```
+
+And alternatively, select a subset of timepoints:
+
+```{r}
+time_inds <- c(50,150,300,500)
+flow1_time <- data.frame(scaled_design, 
+                         t50 = flow1_data[time_inds[1],],
+                         t150 = flow1_data[time_inds[2],],
+                         t300 = flow1_data[time_inds[3],],
+                         t500 = flow1_data[time_inds[4],])
+```
+
+Splitting into train/validation for later:
+
+```{r}
+tt <- TrainTestSplit(scaled_design, seed = 58219)
+train_inds <- tt$train_inds
+val_inds <- tt$val_inds
+```
+
+
+
+## Default emulation
+
+`FitEmulators` is the main function for training emulators.
+
+If we just apply it to our data above, providing as little as possible:
+
+```{r}
+em_time <- FitEmulators(flow1_time[train_inds,])
+em_coeffs <- FitEmulators(flow1_coeffs[train_inds,])
+```
+
+Comparing what's been fitted:
+
+```{r}
+summary(em_time)
+em_time$response
+```
+
+```{r}
+summary(em_coeffs)
+unlist(lapply(1:5, function(k) em_coeffs[[k]]$response))
+```
+
+This highlights a key difference in the default behaviour:
+
+  * If the provided data includes a column named `C1`, `FitEmulators` will automatically set all preceding columns as the emulator inputs, and will train emulators for `C1` **and all subsequent columns**. Here, `flow1_coeffs` containa the leading 5 coefficients, hence 5 emulators have been trained.
+  
+  * There's no column named `C1` in `flow1_time`. Given no other information, `FitEmulators` assumes the final column is the target output, and all preceding columns are inputs. Therefore, `t50`, `t150` and `t300` have been included as predictors (along with the 4 actual inputs) for emulating `t500`:
+  
+```{r}
+em_time$em
+```
+
+To instead get what we obviously intend here (emulate each of the 4 time points using the 4 input columns), we need to add some extra information. First, we can point towards which columns are inputs:
+
+```{r, results='hide'}
+em_time <- FitEmulators(flow1_time[train_inds,], input = 1:4)
+```
+
+```{r}
+summary(em_time)
+em_time$response
+```
+
+This still fits a single emulator for `t500`, but now only uses the first 4 columns as inputs. To emulate all 4 outputs:
+
+```{r, results='hide'}
+em_time <- FitEmulators(flow1_time[train_inds,], input = 1:4, output = c('t50', 't150', 't300', 't500'))
+```
+
+```{r}
+summary(em_time)
+unlist(lapply(1:4, function(k) em_time[[k]]$response))
+```
+
+(Alternatively, can select the outputs with column indices:)
+
+```{r, results='hide'}
+em_time <- FitEmulators(flow1_time[train_inds,], input = 1:4, output_inds = 5:8)
+```
+
+```{r}
+summary(em_time)
+unlist(lapply(1:4, function(k) em_time[[k]]$response))
+```
+
+
+
+## Plotting emulators
+
+The two main things we might want to immediately consider are leave-one-outs and predictions on some out-of-sample set.
+
+We can produce these for an individual emulator:
+
+```{r}
+Validate(em_time[[1]], flow1_time[val_inds,])
+```
+
+```{r}
+LeaveOneOut(em_time[[1]])
+```
+
+Or for multiple (recommended to store as a named object, as it will return each plot in a list, but also immediately print all in a single plot):
+
+```{r}
+val_time <- Validate(em_time, flow1_time[val_inds,])
+summary(val_time)
+```
+
+```{r}
+loo_time <- LeaveOneOut(em_time)
+```
+
+There's other plotting options, e.g., ordering by index instead:
+
+```{r, fig.height=4}
+val_time <- Validate(em_time, flow1_time[val_inds,], by_index = TRUE)
+```
+
+And/or by input:
+
+```{r, results='hide'}
+val_time <- Validate(em_time, flow1_time[val_inds,], by_index = TRUE, by_input = TRUE)
+```
+
+This doesn't automatically print all plots, but the `by_input` plots can be found via:
+
+```{r, fig.height=4}
+val_time[[1]]$input
+```
+
+
+
+## Refitting a specific emulator
+
+By default, the same assumptions are used (currently) for each emulator. These might not be suitable across all outputs. Above, the out-of-sample predictions for `t150` aren't ideal (outside 95\% prediction intervals for 6 of the 25 points), so we may want to refit this with a different method.
+
+We can replace the existing emulator with a version refitted with different assumptions via:
+
+```{r}
+em_time <- RefitEmulator(em_time, 't150', method = 'het')
+```
+
+Instead of rgasp, we're tried fitting using hetGP instead. Reproducing the validation plots from before, we see the 2nd has been switched with the new emulator:
+
+```{r, fig.height=4}
+val_time <- Validate(em_time, flow1_time[val_inds,], by_index = TRUE)
+```
+
+At least when considering the 25 validation points, this has improved predictions.
+
+
+
+## Fitting different emulator types
+
+We could directly compare different methods for emulating the same output. We could use `FitEmulators` as follows to fit for 4 different methods:
+
+```{r}
+# emC1_v1 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 1:4, output = 'C1')
+# emC1_v2 <- FitEmulators(flow1_coeffs[train_inds,], method = 'het', input = 1:4, output = 'C1')
+# # emC1_v3 <- FitEmulators(flow1_coeffs[train_inds,], method = 'gp', input = 1:4, output = 'C1')
+# emC1_v4 <- FitEmulators(flow1_coeffs[train_inds,], method = 'dgp', input = 1:4, output = 'C1')
+```
+
+And can then combine these into a single list to enable us to use the plotting functions as before:
+
+```{r}
+# emC1 <- list(emC1_v1, emC1_v2, emC1_v3, emC1_v4)
+# val_C1 <- Validate(emC1, flow1_coeffs[val_inds,], by_index = TRUE)
+```
+
+
+
+## Different input sets
+
+We could instead use different sets of inputs (more useful if emulating different outputs where different active sets of inputs, but as an illustration just done for `C1`):
+
+```{r, results='hide'}
+emC1_v1 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 4, output = 'C1')
+emC1_v2 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 3:4, output = 'C1')
+emC1_v3 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 2:4, output = 'C1')
+emC1_v4 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 1:4, output = 'C1')
+```
+
+
+```{r}
+emC1 <- list(emC1_v1, emC1_v2, emC1_v3, emC1_v4)
+val_C1 <- Validate(emC1, flow1_coeffs[val_inds,], by_index = TRUE)
+```
+
+
+## Different covariance functions
+
+```{r, results='hide'}
+emC1_v1 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 1:4, covariance = 'matern5_2', output = 'C1')
+emC1_v2 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 1:4, covariance = 'matern3_2', output = 'C1')
+emC1_v3 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 1:4, covariance = 'sexp', output = 'C1')
+```
+
+```{r}
+emC1 <- list(emC1_v1, emC1_v2, emC1_v3)
+val_C1 <- Validate(emC1, flow1_coeffs[val_inds,], by_index = TRUE)
+```
+
+## With/without nugget
+
+Could also compare fitting the emulator with and without a nugget term:
+
+```{r, results='hide'}
+emC1_v1 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 1:4, output = 'C1', nugget = TRUE)
+emC1_v2 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 1:4, output = 'C1', nugget = FALSE)
+```
+
+
+```{r}
+emC1 <- list(emC1_v1, emC1_v2)
+val_C1 <- Validate(emC1, flow1_coeffs[val_inds,], by_index = TRUE)
+```
+
+
+
+
+
+
+
+
