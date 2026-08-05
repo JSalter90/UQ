@@ -736,7 +736,7 @@ Validate <- function(emulator, valData, interval = 0.95, by_input = FALSE, by_in
   }
   
   if (n_em == 1){
-    plot <- ValidateSingle(emulator, valData, by_input, by_index, Obs = Obs)
+    plot <- ValidateSingle(emulator, valData, interval, by_input, by_index, Obs = Obs)
   }
   
   else {
