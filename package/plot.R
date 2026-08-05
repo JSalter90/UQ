@@ -1,37 +1,34 @@
 #' Functions for plotting
+
+#' Plots the first q basis vectors
 #' 
 #' 
-
-# Make sure 3D version works well
-# Also case of 1D profile + multiple outputs, but not sure you'd want to plot like this anyway
-
-#' #' Plots a 1D representation of the 1st q basis vectors
 #'
 #' @param DataBasis 
 #' @param q 
-#' @param plot_inds
+#' @param output_inds
 #' 
 #' @return 
 #' 
 #'
-#' @importFrom ggplot2 ggplot aes geom_point geom_line geom_errorbar scale_colour_manual labs vars geom_abline theme theme_bw
+#' @importFrom ggplot2 ggplot aes geom_point geom_line geom_errorbar scale_colour_manual labs vars geom_abline theme theme_bw facet_wrap
 #' @importFrom rlang .data
 NULL
 #' 
 #' @export
-PlotBasis <- function(DataBasis, q = 9,  plot_inds = NULL){
+PlotBasis <- function(DataBasis, q = 9,  output_inds = NULL){
   
   # Dimension of basis
   ell <- nrow(DataBasis$tBasis)
   
   # If a specific subset hasn't been selected, use all ell dimensions
-  if (is.null(plot_inds)){
-    plot_inds <- 1:ell
+  if (is.null(output_inds)){
+    output_inds <- 1:ell
   }
   
   # Extract dimension names and locations from DataBasis
   input_names <- colnames(DataBasis$grid)
-  input_values <- DataBasis$grid[plot_inds,]
+  input_values <- DataBasis$grid[output_inds,]
   
   # If not provided, set
   if (is.null(input_names)){
@@ -39,7 +36,7 @@ PlotBasis <- function(DataBasis, q = 9,  plot_inds = NULL){
   }
   
   if (is.null(input_values)){
-    input_values <- plot_inds
+    input_values <- output_inds
   }
 
   # Flag for whether the 2nd dimension relates to grid values or multiple variables
@@ -49,8 +46,8 @@ PlotBasis <- function(DataBasis, q = 9,  plot_inds = NULL){
 
   if (length(input_names) == 1){
     plot_data <- data.frame(Input = input_values,
-                            Vector = rep(1:q, each = length(plot_inds)),
-                            Weight = c(DataBasis$tBasis[plot_inds,1:q]))
+                            Vector = rep(1:q, each = length(output_inds)),
+                            Weight = c(DataBasis$tBasis[output_inds,1:q]))
     
     plot <- ggplot(plot_data, aes(x = .data$Input, y = .data$Weight)) +
       geom_line() +
@@ -63,10 +60,10 @@ PlotBasis <- function(DataBasis, q = 9,  plot_inds = NULL){
   else if (length(input_names) == 2 & !multi_var){
     plot_data <- data.frame(Input1 = input_values[,1],
                             Input2 = input_values[,2],
-                            Vector = rep(1:q, each = length(plot_inds)),
-                            Weight = c(DataBasis$tBasis[plot_inds,1:q]))
+                            Vector = rep(1:q, each = length(output_inds)),
+                            Weight = c(DataBasis$tBasis[output_inds,1:q]))
     
-    point_size <- ifelse(length(plot_inds) >= 1000 & q > 3, 0.25, 0.75)
+    point_size <- ifelse(length(output_inds) >= 1000 & q > 3, 0.25, 0.75)
     
     plot <- ggplot(plot_data, aes(.data$Input1, .data$Input2, col = .data$Weight)) +
       geom_point(size = point_size) +
@@ -79,8 +76,8 @@ PlotBasis <- function(DataBasis, q = 9,  plot_inds = NULL){
   else if (length(input_names) == 2 & multi_var){
     plot_data <- data.frame(Input = input_values[,1],
                             Variable = input_values[,2],
-                            Vector = rep(1:q, each = length(plot_inds)),
-                            Weight = c(DataBasis$tBasis[plot_inds,1:q]))
+                            Vector = rep(1:q, each = length(output_inds)),
+                            Weight = c(DataBasis$tBasis[output_inds,1:q]))
     
     plot <- ggplot(plot_data, aes(.data$Input, .data$Weight)) +
       geom_line() +
@@ -108,24 +105,24 @@ PlotBasis <- function(DataBasis, q = 9,  plot_inds = NULL){
 #'
 #' @param DataBasis 
 #' @param AddMean 
-#' @param ens_inds 
-#' 
+#' @param data_inds Which (simulation) data to plot. If NULL, plots all contained in `DataBasis`.
+#' @param output_inds Which output locations to plot. If NULL, plots all.
 #' 
 #' @return
 #' 
 #' @export
-PlotData <- function(DataBasis, AddMean = TRUE, ens_inds = NULL, plot_inds = NULL, Obs = NULL, MeanOnly = FALSE){
+PlotData <- function(DataBasis, AddMean = TRUE, data_inds = NULL, output_inds = NULL, Obs = NULL, MeanOnly = FALSE){
   
   ell <- nrow(DataBasis$tBasis)
   n <- ncol(DataBasis$CentredField)
   
   # If a specific subset hasn't been selected, use all ell dimensions
-  if (is.null(plot_inds)){
-    plot_inds <- 1:ell
+  if (is.null(output_inds)){
+    output_inds <- 1:ell
   }
   
   # Extract dimension names and locations from DataBasis
-  input_values <- DataBasis$grid[plot_inds,]
+  input_values <- DataBasis$grid[output_inds,]
   input_names <- colnames(DataBasis$grid)
   
   # If not provided, set
@@ -134,17 +131,17 @@ PlotData <- function(DataBasis, AddMean = TRUE, ens_inds = NULL, plot_inds = NUL
   }
   
   if (is.null(input_values)){
-    input_values <- plot_inds
+    input_values <- output_inds
   }
   
-  if (is.null(ens_inds)){
-    ens_inds <- 1:n
+  if (is.null(data_inds)){
+    data_inds <- 1:n
   }
   
   if (MeanOnly){
     DataBasis$CentredField <- 0*DataBasis$CentredField
     mu <- DataBasis$EnsembleMean
-    ens_inds <- 1
+    data_inds <- 1
   }
   
   else if (AddMean){
@@ -157,7 +154,7 @@ PlotData <- function(DataBasis, AddMean = TRUE, ens_inds = NULL, plot_inds = NUL
   
   # Process obs if provided
   if (!(is.null(Obs))){
-    Obs <- Obs[plot_inds]
+    Obs <- Obs[output_inds]
     
     if (!(AddMean)){
       Obs <- Obs - DataBasis$EnsembleMean
@@ -171,8 +168,8 @@ PlotData <- function(DataBasis, AddMean = TRUE, ens_inds = NULL, plot_inds = NUL
 
   if (length(input_names) == 1){
     plot_data <- data.frame(Input = input_values,
-                            Output = c(DataBasis$CentredField[plot_inds,ens_inds] + mu),
-                            Run = rep(ens_inds, each = length(plot_inds)))
+                            Output = c(DataBasis$CentredField[output_inds,data_inds] + mu),
+                            Run = rep(data_inds, each = length(output_inds)))
     
     if (MeanOnly){
       plot_data$Run <- 'Mean'
@@ -195,14 +192,14 @@ PlotData <- function(DataBasis, AddMean = TRUE, ens_inds = NULL, plot_inds = NUL
   else if (length(input_names) == 2 & !multi_var){
     plot_data <- data.frame(Input1 = input_values[,1],
                             Input2 = input_values[,2],
-                            Output = c(DataBasis$CentredField[plot_inds,ens_inds] + mu[plot_inds]),
-                            Run = rep(ens_inds, each = length(plot_inds)))
+                            Output = c(DataBasis$CentredField[output_inds,data_inds] + mu[output_inds]),
+                            Run = rep(data_inds, each = length(output_inds)))
     
     if (MeanOnly){
       plot_data$Run <- 'Mean'
     }
     
-    point_size <- ifelse(length(plot_inds) >= 1000 & length(ens_inds) > 3, 0.25, 0.75)
+    point_size <- ifelse(length(output_inds) >= 1000 & length(data_inds) > 3, 0.25, 0.75)
     
     plot <- ggplot(plot_data, aes(x = .data$Input1, y = .data$Input2, col = .data$Output)) +
       geom_point(size = point_size) +
@@ -215,8 +212,8 @@ PlotData <- function(DataBasis, AddMean = TRUE, ens_inds = NULL, plot_inds = NUL
   else if (length(input_names) == 2 & multi_var){
     plot_data <- data.frame(Input = input_values[,1],
                             Variable = input_values[,2],
-                            Output = c(DataBasis$CentredField[plot_inds,ens_inds] + mu[plot_inds]),
-                            Run = rep(ens_inds, each = length(plot_inds)))
+                            Output = c(DataBasis$CentredField[output_inds,data_inds] + mu[output_inds]),
+                            Run = rep(data_inds, each = length(output_inds)))
     
     if (MeanOnly){
       plot_data$Run <- 'Mean'
@@ -307,7 +304,7 @@ PlotResid <- function(DataBasis, obs, q, ...){
   plot <- ggplot(plot_resids, aes(x = .data$Input, y = .data$Error)) +
     geom_line() +
     facet_wrap(vars(.data$q)) +
-    labs(x = input_name) +
+    labs(x = input_names[1]) +
     theme_bw() +
     theme(legend.position = 'none')
   return(plot)
@@ -322,7 +319,7 @@ PlotResid <- function(DataBasis, obs, q, ...){
 #'
 #' @param DataBasis 
 #' @param q 
-#' @param inds 
+#' @param data_inds 
 #' @param AddMean 
 #' @param residual 
 #' @param input_values 
@@ -333,10 +330,10 @@ PlotResid <- function(DataBasis, obs, q, ...){
 #' @return
 #' 
 #' @export
-PlotRecon <- function(DataBasis, q = 1, inds = 1:16, AddMean = TRUE, residual = FALSE, input_values = NULL, input_name = NULL, output_name = NULL, ...){
+PlotRecon <- function(DataBasis, q = 1, data_inds = 1:16, AddMean = TRUE, residual = FALSE, input_values = NULL, input_name = NULL, output_name = NULL, ...){
   
   ell <- nrow(DataBasis$tBasis)
-  fields <- DataBasis$CentredField[,inds]
+  fields <- DataBasis$CentredField[,data_inds]
   basis <- DataBasis$tBasis[,1:q]
   recons <- ReconField(fields, basis)
   
@@ -374,8 +371,8 @@ PlotRecon <- function(DataBasis, q = 1, inds = 1:16, AddMean = TRUE, residual = 
     if (!(residual)){
       plot_data <- data.frame(Input = input_values, 
                               Output = c(c(recons) + mu, c(fields) + mu),
-                              Type = rep(c('Recon', 'Truth'), each = ell*length(inds)),
-                              Run = rep(inds, each = ell))
+                              Type = rep(c('Recon', 'Truth'), each = ell*length(data_inds)),
+                              Run = rep(data_inds, each = ell))
       
       plot <- ggplot(plot_data, aes(.data$Input, .data$Output, col = .data$Type)) + 
         geom_line(linewidth = 1) +
@@ -388,7 +385,7 @@ PlotRecon <- function(DataBasis, q = 1, inds = 1:16, AddMean = TRUE, residual = 
     if (residual){
       plot_data <- data.frame(Input = input_values, 
                               Residual = c(fields - recons),
-                              Run = rep(inds, each = ell))
+                              Run = rep(data_inds, each = ell))
       
       plot <- ggplot(plot_data, aes(.data$Input, .data$Residual)) + 
         geom_line(col = 'red', linewidth = 1) +
@@ -404,9 +401,9 @@ PlotRecon <- function(DataBasis, q = 1, inds = 1:16, AddMean = TRUE, residual = 
       plot_data <- data.frame(Input1 = input_values[,1],
                               Input2 = input_values[,2],
                               Output = c(recons) + mu,
-                              Run = rep(inds, each = ell))
+                              Run = rep(data_inds, each = ell))
       
-      point_size <- ifelse(ell >= 1000 & length(inds) > 3, 0.25, 0.75)
+      point_size <- ifelse(ell >= 1000 & length(data_inds) > 3, 0.25, 0.75)
       
       plot <- ggplot(plot_data, aes(x = .data$Input1, y = .data$Input2, col = .data$Output)) + 
         geom_point(size = point_size) +
@@ -420,13 +417,13 @@ PlotRecon <- function(DataBasis, q = 1, inds = 1:16, AddMean = TRUE, residual = 
       plot_data <- data.frame(Input1 = input_values[,1],
                               Input2 = input_values[,2],
                               Residual = c(fields - recons),
-                              Run = rep(inds, each = ell))
+                              Run = rep(data_inds, each = ell))
       
-      point_size <- ifelse(ell >= 1000 & length(inds) > 3, 0.25, 0.75)
+      point_size <- ifelse(ell >= 1000 & length(data_inds) > 3, 0.25, 0.75)
       
       plot <- ggplot(plot_data, aes(x = .data$Input1, y = .data$Input2, col = .data$Residual)) + 
         geom_point(size = point_size) +
-        scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red') +
+        ggplot2::scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red') +
         facet_wrap(vars(.data$Run), scales = 'fixed') +
         theme_bw() +
         labs(x = input_names[1], y = input_names[2])
@@ -442,8 +439,8 @@ PlotRecon <- function(DataBasis, q = 1, inds = 1:16, AddMean = TRUE, residual = 
       plot_data <- data.frame(Input = input_values[,1],
                               Variable = input_values[,2],
                               Output = c(c(recons) + mu, c(fields) + mu),
-                              Type = rep(c('Recon', 'Truth'), each = ell*length(inds)),
-                              Run = rep(inds, each = ell))
+                              Type = rep(c('Recon', 'Truth'), each = ell*length(data_inds)),
+                              Run = rep(data_inds, each = ell))
       
       plot <- ggplot(plot_data, aes(.data$Input, .data$Output, col = .data$Type)) + 
         geom_line(linewidth = 1) +
@@ -457,7 +454,7 @@ PlotRecon <- function(DataBasis, q = 1, inds = 1:16, AddMean = TRUE, residual = 
       plot_data <- data.frame(Input = input_values[,1],
                               Variable = input_values[,2],
                               Residual = c(fields - recons),
-                              Run = rep(inds, each = ell))
+                              Run = rep(data_inds, each = ell))
       
       plot <- ggplot(plot_data, aes(.data$Input, .data$Residual)) + 
         geom_line(col = 'red', linewidth = 1) +
@@ -478,9 +475,6 @@ PlotRecon <- function(DataBasis, q = 1, inds = 1:16, AddMean = TRUE, residual = 
 
 
 
-# Probably need a clearer distinction between validation inds and generic inds
-
-
 #' Plotting emulator samples
 #'
 #' Takes samples (or a summary of these) from BasisEmSamples and plots, adds the truth if this is provided
@@ -497,12 +491,12 @@ PlotRecon <- function(DataBasis, q = 1, inds = 1:16, AddMean = TRUE, residual = 
 #' @import ggplot2
 #' 
 #' @export
-PlotSamples <- function(DataBasis, ems = NULL, design = NULL, samples = NULL, output_name = NULL, validation_inds = NULL, sample_inds = NULL, output_inds = NULL, interval = 0.95, AddMean = TRUE, Obs = NULL,...){
+PlotSamples <- function(DataBasis, ems = NULL, design = NULL, samples = NULL, output_name = NULL, data_inds = NULL, sample_inds = NULL, output_inds = NULL, interval = 0.95, AddMean = TRUE, Obs = NULL,...){
 
   # Various combinations of design, samples, ems can be provided
-  if (!(is.null(design)) & is.null(samples) & !(is.null(validation_inds))){  
+  if (!(is.null(design)) & is.null(samples) & !(is.null(data_inds))){  
     # Generate emulator predictions at required locations only
-    preds <- Predict(ems, design[validation_inds,])
+    preds <- Predict(ems, design[data_inds,])
     # Draw samples
     Samples <- BasisEmSamples(preds, DataBasis, AddMean = AddMean, ...)
   }
@@ -511,8 +505,8 @@ PlotSamples <- function(DataBasis, ems = NULL, design = NULL, samples = NULL, ou
     stop('Must provide either a design and emulators for prediction, or a set of samples')
   }
   
-  # If validation_inds not provided, use all of design
-  else if (is.null(samples) & is.null(validation_inds)){
+  # If data_inds not provided, use all of design
+  else if (is.null(samples) & is.null(data_inds)){
     preds <- Predict(ems, design)
     Samples <- BasisEmSamples(preds, DataBasis, AddMean = AddMean, ...)
   }
@@ -528,15 +522,15 @@ PlotSamples <- function(DataBasis, ems = NULL, design = NULL, samples = NULL, ou
   interval <- c((1-interval)/2, 1 - (1-interval)/2)
 
   # Construct truth
-  if (!(is.null(validation_inds))){
+  if (!(is.null(data_inds))){
     if (AddMean){
-      Truth <- DataBasis$CentredField[,validation_inds] + DataBasis$EnsembleMean
+      Truth <- DataBasis$CentredField[,data_inds] + DataBasis$EnsembleMean
     }
     else {
-      Truth <- DataBasis$CentredField[,validation_inds]
+      Truth <- DataBasis$CentredField[,data_inds]
     }
     
-    inds <- validation_inds
+    inds <- data_inds
   }
   
   else {
@@ -613,14 +607,14 @@ PlotSamples <- function(DataBasis, ems = NULL, design = NULL, samples = NULL, ou
                             Type = 'Samples')
     
     # Calculate summaries using all samples
-    plot_data_summary <- rbind(data.frame(aggregate(Output ~ Input + Run, plot_data, mean), Type = 'Mean'),
-                               data.frame(aggregate(Output ~ Input + Run, plot_data, quantile, probs = interval[1]), Type = 'Lower'),
-                               data.frame(aggregate(Output ~ Input + Run, plot_data, quantile, probs = interval[2]), Type = 'Upper'))
+    plot_data_summary <- rbind(data.frame(stats::aggregate(Output ~ Input + Run, plot_data, mean), Type = 'Mean'),
+                               data.frame(stats::aggregate(Output ~ Input + Run, plot_data, stats::quantile, probs = interval[1]), Type = 'Lower'),
+                               data.frame(stats::aggregate(Output ~ Input + Run, plot_data, stats::quantile, probs = interval[2]), Type = 'Upper'))
     
     plot_data_summary$s <- max(plot_data$s)+1
     plot_data_summary$s[which(plot_data_summary$Type == 'Lower')] <- max(plot_data$s)+2 # to allow to set different linetype
     plot_data_summary$s[which(plot_data_summary$Type == 'Upper')] <- max(plot_data$s)+3 # to allow to set different linetype
-    plot_data_summary$Type[which(plot_data_summary$Type %in% c('Lower','Upper'))] <- '95%'
+    plot_data_summary$Type[which(plot_data_summary$Type %in% c('Lower','Upper'))] <- paste0(100*diff(interval), '%')
     plot_data_summary <- plot_data_summary[,colnames(plot_data)]
     
     # Filter out unneeded samples
@@ -628,7 +622,7 @@ PlotSamples <- function(DataBasis, ems = NULL, design = NULL, samples = NULL, ou
     
     # Combine summaries with samples
     plot_data <- rbind(plot_data, plot_data_summary)
-    plot_data$Type <- factor(plot_data$Type, levels = c('Samples', 'Mean', '95%'))
+    plot_data$Type <- factor(plot_data$Type, levels = c('Samples', 'Mean', paste0(100*diff(interval), '%')))
 
     plot <- ggplot(plot_data, aes(.data$Input, .data$Output, linetype = .data$Type, linewidth = as.factor(.data$s), col = .data$Type)) + 
       geom_line() +
@@ -681,14 +675,14 @@ PlotSamples <- function(DataBasis, ems = NULL, design = NULL, samples = NULL, ou
                             Run = rep(inds, each = length(output_inds)*ns),
                             Type = 'Samples')
     
-    plot_data_summary <- rbind(data.frame(aggregate(Output ~ Input + Variable + Run, plot_data, mean), Type = 'Mean'),
-                               data.frame(aggregate(Output ~ Input + Variable + Run, plot_data, quantile, probs = interval[1]), Type = 'Lower'),
-                               data.frame(aggregate(Output ~ Input + Variable + Run, plot_data, quantile, probs = interval[2]), Type = 'Upper'))
+    plot_data_summary <- rbind(data.frame(stats::aggregate(Output ~ Input + Variable + Run, plot_data, mean), Type = 'Mean'),
+                               data.frame(stats::aggregate(Output ~ Input + Variable + Run, plot_data, stats::quantile, probs = interval[1]), Type = 'Lower'),
+                               data.frame(stats::aggregate(Output ~ Input + Variable + Run, plot_data, stats::quantile, probs = interval[2]), Type = 'Upper'))
     
     plot_data_summary$s <- max(plot_data$s)+1
     plot_data_summary$s[which(plot_data_summary$Type == 'Lower')] <- max(plot_data$s)+2 # to allow to set different linetype
     plot_data_summary$s[which(plot_data_summary$Type == 'Upper')] <- max(plot_data$s)+3 # to allow to set different linetype
-    plot_data_summary$Type[which(plot_data_summary$Type %in% c('Lower','Upper'))] <- '95%'
+    plot_data_summary$Type[which(plot_data_summary$Type %in% c('Lower','Upper'))] <- paste0(100*diff(interval), '%')
     plot_data_summary <- plot_data_summary[,colnames(plot_data)]
     
     # Filter out unneeded samples
@@ -696,7 +690,7 @@ PlotSamples <- function(DataBasis, ems = NULL, design = NULL, samples = NULL, ou
     
     # Combine summaries with samples
     plot_data <- rbind(plot_data, plot_data_summary)
-    plot_data$Type <- factor(plot_data$Type, levels = c('Samples', 'Mean', '95%'))
+    plot_data$Type <- factor(plot_data$Type, levels = c('Samples', 'Mean', paste0(100*diff(interval), '%')))
     
     plot <- ggplot(plot_data, aes(.data$Input, .data$Output, linetype = .data$Type, linewidth = as.factor(.data$s), col = .data$Type)) + 
       geom_line() +
@@ -828,7 +822,7 @@ PlotReconError <- function(DataBasis, obs, qmax = NULL, ...){
   RW <- errors(DataBasis$tBasis[,1:qmax], obs, ...)
   
   # Theoretical bound
-  bound <- qchisq(0.995, length(obs))/length(obs)
+  bound <- stats::qchisq(0.995, length(obs))/length(obs)
   
   plot <- ggplot(data.frame(q = 1:qmax, y = RW), aes(x = .data$q, y = .data$y)) +
     geom_line(col = 'red') +
