@@ -106,7 +106,7 @@ GetEmData <- function(Design, DataBasis, q = NULL, Noise = FALSE, weightinv = NU
   }
 
   if (Noise){
-    Noise <- runif(nrow(Design),input_range[1],input_range[2])
+    Noise <- stats::runif(nrow(Design),input_range[1],input_range[2])
     Design <- cbind(Design, Noise)
   }
   
@@ -611,7 +611,7 @@ BasisEmSamples <- function(BasisPred, DataBasis, ns = 100, AddMean = TRUE, Retur
   if (BasisUncertainty){
     BasMinusQ <- DataBasis$tBasis[,-(1:q)] # get deleted vectors
     DeletedCoeffs <- Project(DataBasis$CentredField, BasMinusQ, ...) # project onto these vectors
-    EstVar <- apply(DeletedCoeffs, 2, var) # variance on these vectors
+    EstVar <- apply(DeletedCoeffs, 2, stats::var) # variance on these vectors
     
     # Want full basis when reconstructing now
     Basis <- DataBasis$tBasis
@@ -631,18 +631,18 @@ BasisEmSamples <- function(BasisPred, DataBasis, ns = 100, AddMean = TRUE, Retur
   }
   
   if (n == 1){
-    samp <- matrix(rnorm(q*ns,
-                         mean = rep(BasisPred$Expectation),
-                         sd = rep(sqrt(BasisPred$Variance))), nrow = ns, byrow = TRUE)
+    samp <- matrix(stats::rnorm(q*ns,
+                                mean = rep(BasisPred$Expectation),
+                                sd = rep(sqrt(BasisPred$Variance))), nrow = ns, byrow = TRUE)
     em_samp <- mu + Basis %*% t(samp)
   }
   
   if (n > 1){
     em_samp <- array(0, dim = c(ell, ns, n))
     for (i in 1:n){
-      samp <- matrix(rnorm(q*ns,
-                           mean = rep(BasisPred$Expectation[i,]),
-                           sd = rep(sqrt(BasisPred$Variance[i,]))), nrow = ns, byrow = TRUE)
+      samp <- matrix(stats::rnorm(q*ns,
+                                  mean = rep(BasisPred$Expectation[i,]),
+                                  sd = rep(sqrt(BasisPred$Variance[i,]))), nrow = ns, byrow = TRUE)
       em_samp[,,i] <- mu + Basis %*% t(samp)
     }
   }
@@ -655,14 +655,14 @@ BasisEmSamples <- function(BasisPred, DataBasis, ns = 100, AddMean = TRUE, Retur
     
     if (n == 1){
       samp_mean <- apply(em_samp, 1, mean)
-      lower <- apply(em_samp, 1, quantile, probs = 0.025)
-      upper <- apply(em_samp, 1, quantile, probs = 0.975)
+      lower <- apply(em_samp, 1, stats::quantile, probs = 0.025)
+      upper <- apply(em_samp, 1, stats::quantile, probs = 0.975)
     }
     
     if (n > 1){
       samp_mean <- apply(em_samp, c(1,3), mean)
-      lower <- apply(em_samp, c(1,3), quantile, probs = 0.025)
-      upper <- apply(em_samp, c(1,3), quantile, probs = 0.975)
+      lower <- apply(em_samp, c(1,3), stats::quantile, probs = 0.025)
+      upper <- apply(em_samp, c(1,3), stats::quantile, probs = 0.975)
     }
     
     return(list(mean = samp_mean,
