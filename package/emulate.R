@@ -24,43 +24,43 @@ cols_good <- viridis::viridis(100)[65]
 #' @param tData a data frame containing, at a minimum, the design and output(s) to be emulated. May also contain a noise column. May be the output of `ProcessData`, but could be created by hand.
 #' @param method
 #' @param inputs
-#' @param emulate_inds which column indices to fit emulators for. Defaults to NULL, in which case emulates the final column of `tData` only
-#' @param emulate_names which column names to fit emulators for. Defaults to NULL, in which case emulates the final column of `tData` only
+#' @param output which column names to fit emulators for. Defaults to NULL, in which case emulates the final column of `tData` only
+#' @param output_cols which column indices to fit emulators for. Defaults to NULL, in which case emulates the final column of `tData` only
 #' @param ... arguments for `BuildGasp`, `BuildHet`, `BuildGP` or `BuildDGP`
 #' 
 #' @return A list of emulators
 #' 
 #' @export
-FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, output_inds = NULL, 
+FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, output_cols = NULL, 
                          covariance = 'matern5_2', nugget = TRUE, ...){
   
   n <- nrow(tData)
   p1 <- ncol(tData)
   
   # If nothing specific provided, first search for column named C1, and emulate this and all subsequent columns
-  if (is.null(output_inds) & is.null(output)){
+  if (is.null(output_cols) & is.null(output)){
     c1_ind <- which(colnames(tData) == 'C1')
     if (length(c1_ind) > 0){
-      output_inds <- c1_ind:p1
-      output <- colnames(tData)[output_inds]
+      output_cols <- c1_ind:p1
+      output <- colnames(tData)[output_cols]
     }
     
     # Otherwise select final column of tData to train emulator
     else {
-      output_inds <- p1
-      output <- colnames(tData)[output_inds]
+      output_cols <- p1
+      output <- colnames(tData)[output_cols]
     }
   }
   
-  if (is.null(output_inds) & !is.null(output)){
-    output_inds <- which(colnames(tData) %in% output)
+  if (is.null(output_cols) & !is.null(output)){
+    output_cols <- which(colnames(tData) %in% output)
   }
   
-  if (!is.null(output_inds) & is.null(output)){
-    output <- colnames(tData)[output_inds]
+  if (!is.null(output_cols) & is.null(output)){
+    output <- colnames(tData)[output_cols]
   }
   
-  n_em <- length(output_inds) # number of emulators to be fitted
+  n_em <- length(output_cols) # number of emulators to be fitted
   
   # n_em may be empty if provided names are not contained in tData
   if (n_em < 1){
@@ -68,13 +68,13 @@ FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, o
   }
   
   # Attempt to select columns with too high index
-  if (any(output_inds) > p1){
+  if (any(output_cols) > p1){
     stop('At least one provided index is higher than the number of dimensions of tData, please remove')
   }
   
   # If nothing specific provided, set inputs as all but emulated columns
   if (is.null(input)){
-    input <- c(1:p1)[-output_inds]
+    input <- c(1:p1)[-output_cols]
   }
   
   if (length(input) == 0){
@@ -82,7 +82,7 @@ FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, o
   }
   
   # Filter down to required inputs and outputs
-  tData <- tData[,c(input, output_inds)]
+  tData <- tData[,c(input, output_cols)]
   
   # Relabel
   input <- 1:length(input)
@@ -188,10 +188,11 @@ RefitEmulator <- function(emulators, Response, tData = NULL, method = 'rgasp', .
 
 #' Scale design
 #' 
+#' @param design 
+#' @param InputRanges 
+#' @param range 
 #' 
-#' 
-#' 
-#' 
+#' @returns description
 #' 
 ScaleInputs <- function(design, InputRanges, range = c(0,1)){
   
@@ -431,10 +432,10 @@ BuildGasp <- function(Response, tData, input = NULL, mean_fn = NULL, linModel = 
     em_lm <- mean_fn
     #X <- model.matrix(linModel)
     # In case linear model wasn't fitted with exact same data:
-    tt <- terms(linModel)
-    tt <- delete.response(tt)
-    mm <- model.frame(tt, train_input)
-    X <- model.matrix(tt, mm)
+    tt <- stats::terms(linModel)
+    tt <- stats::delete.response(tt)
+    mm <- stats::model.frame(tt, tData_input)
+    X <- stats::model.matrix(tt, mm)
     em <- RobustGaSP::rgasp(design = tData_input, response = tData_response, trend = as.matrix(X), kernel_type = covariance, nugget.est = nugget, ...)
   }
   
@@ -456,6 +457,19 @@ BuildGasp <- function(Response, tData, input = NULL, mean_fn = NULL, linModel = 
 
 
 
+#' Title
+#'
+#' @param Response 
+#' @param tData 
+#' @param input 
+#' @param covariance 
+#' @param nugget 
+#' @param ... 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 BuildGP <- function(Response, tData, input = NULL, covariance = 'matern5_2', nugget = TRUE, ...){
   
   ind_response <- which(colnames(tData) == Response)
@@ -493,6 +507,18 @@ BuildGP <- function(Response, tData, input = NULL, covariance = 'matern5_2', nug
 }
 
 
+#' Title
+#'
+#' @param Response 
+#' @param tData 
+#' @param input 
+#' @param covariance 
+#' @param ... 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 BuildDGP <- function(Response, tData, input = NULL, covariance = 'matern5_2', ...){
   
   ind_response <- which(colnames(tData) == Response)
@@ -530,13 +556,16 @@ BuildDGP <- function(Response, tData, input = NULL, covariance = 'matern5_2', ..
 }
 
 
-#' 
-#' By default provide 95%, have variance so can create others by hand?
-#' 
+
 #' Wrapper of 1D predict function for multiple emulators
 #' 
-#' Returns exp, variance, lower/upper
 #' 
+#' @param emulator 
+#' @param design 
+#' 
+#' @returns description
+#' 
+#' @export
 Predict <- function(emulator, design){
 
   # Find number of emulators
@@ -574,11 +603,16 @@ Predict <- function(emulator, design){
 
 
 
+
+#' Title
 #'
+#' @param emulator 
+#' @param design 
 #'
-#' emulator is single instance here
-#' 
+#' @return
+#' @export
 #'
+#' @examples
 PredictSingle <- function(emulator, design){
   
   # Check whether all required inputs are contained in design
@@ -637,6 +671,15 @@ PredictHet <- function(emulator, design){
 
 
 
+#' Title
+#'
+#' @param emulator 
+#' @param design 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 PredictDGP <- function(emulator, design){
   # Ensure columns are ordered in the same way as when the emulator was trained
   col_names <- colnames(emulator$train_data)[-ncol(emulator$train_data)]
@@ -664,16 +707,17 @@ PredictDGP <- function(emulator, design){
 #' 
 #' @export
 PredictGasp <- function(emulator, design){
-  if (class(emulator) == 'rgasp'){
-    noise_ind <- colnames(design) == 'Noise'
-    if (sum(noise_ind) > 0){
-      noise_ind <- which(colnames(design) == 'Noise')
-      design <- design[,c(1:(noise_ind-1))]
-    }
-    preds <- predict(emulator, design)
-  }
+  #### REMOVE, LIKELY REDUNDANT ####
+  # if (class(emulator) == 'rgasp'){
+  #   noise_ind <- colnames(design) == 'Noise'
+  #   if (sum(noise_ind) > 0){
+  #     noise_ind <- which(colnames(design) == 'Noise')
+  #     design <- design[,c(1:(noise_ind-1))]
+  #   }
+  #   preds <- predict(emulator, design)
+  # }
   
-  else if (is.null(emulator$mean_fn)){
+  if (is.null(emulator$mean_fn)){
     noise_ind <- colnames(design) == 'Noise'
     if (sum(noise_ind) > 0){
       noise_ind <- which(colnames(design) == 'Noise')
@@ -700,13 +744,13 @@ PredictGasp <- function(emulator, design){
   }
   
   else if (emulator$mean_fn == 'lm'){
-    tt <- terms(emulator$lm)
-    Terms <- delete.response(tt)
-    # Need to make sure columns are ordered in the same way as when the emulator was trained
+    tt <- stats::terms(emulator$lm)
+    Terms <- stats::delete.response(tt)
+    # Ensure columns are ordered in the same way as when the emulator was trained
     col_names <- colnames(emulator$train_data)[-ncol(emulator$train_data)]
     design <- design[,col_names]
-    mm <- model.frame(Terms, design, xlev = emulator$lm$xlevels)
-    X <- model.matrix(Terms, mm, contrasts.arg = emulator$lm$contrasts)
+    mm <- stats::model.frame(Terms, design, xlev = emulator$lm$xlevels)
+    X <- stats::model.matrix(Terms, mm, contrasts.arg = emulator$lm$contrasts)
     preds <- predict(emulator$em, design, testing_trend = as.matrix(X))
   }
   return(preds)
@@ -720,6 +764,19 @@ PredictGasp <- function(emulator, design){
 
 
 
+#' Title
+#'
+#' @param emulator 
+#' @param valData 
+#' @param interval 
+#' @param by_input 
+#' @param by_index 
+#' @param Obs 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 Validate <- function(emulator, valData, interval = 0.95, by_input = FALSE, by_index = FALSE, Obs = NULL){
   
   if (interval <= 0 | interval >= 1){
@@ -795,16 +852,16 @@ ValidateSingle <- function(emulator, valData, interval = 0.95, by_input = FALSE,
   
   if (emulator$method %in% c('gp', 'dgp')){
     preds <- PredictDGP(emulator, design)
-    preds$lower95 <- preds$mean + qnorm(interval[1])*sqrt(preds$var)
-    preds$upper95 <- preds$mean + qnorm(interval[2])*sqrt(preds$var)
+    preds$lower95 <- preds$mean + stats::qnorm(interval[1])*sqrt(preds$var)
+    preds$upper95 <- preds$mean + stats::qnorm(interval[2])*sqrt(preds$var)
     preds$var <- preds$M <- NULL
   }
   
   if (emulator$method == 'het'){
     preds <- PredictHet(emulator, design)
     vars <- preds$sd2 + preds$nugs
-    preds$lower95 <- preds$mean + qnorm(interval[1])*sqrt(vars)
-    preds$upper95 <- preds$mean + qnorm(interval[2])*sqrt(vars)
+    preds$lower95 <- preds$mean + stats::qnorm(interval[1])*sqrt(vars)
+    preds$upper95 <- preds$mean + stats::qnorm(interval[2])*sqrt(vars)
     preds$sd2var <- preds$cov <- preds$sd2 <- preds$nugs <- NULL
   }
   
@@ -889,6 +946,17 @@ ValidateSingle <- function(emulator, valData, interval = 0.95, by_input = FALSE,
 
 
 
+#' Title
+#'
+#' @param emulator 
+#' @param interval 
+#' @param Obs 
+#' @param ... 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 LeaveOneOut <- function(emulator, interval = 0.95, Obs = NULL, ...){
   
   # Find number of emulators
@@ -941,8 +1009,8 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs =
   
   if (emulator$method == 'rgasp'){
     loo_preds <- RobustGaSP::leave_one_out_rgasp(emulator$em)
-    loo_preds$lower95 <- loo_preds$mean + qnorm(interval[1])*loo_preds$sd
-    loo_preds$upper95 <- loo_preds$mean + qnorm(interval[2])*loo_preds$sd
+    loo_preds$lower95 <- loo_preds$mean + stats::qnorm(interval[1])*loo_preds$sd
+    loo_preds$upper95 <- loo_preds$mean + stats::qnorm(interval[2])*loo_preds$sd
   }
   
   if (emulator$method %in% c('gp', 'dgp')){
@@ -953,8 +1021,8 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs =
   
   if (emulator$method == 'het'){
     loo_preds <- hetGP::LOO_preds(emulator$em)
-    loo_preds$lower95 <- loo_preds$mean + qnorm(interval[1])*sqrt(loo_preds$sd2)
-    loo_preds$upper95 <- loo_preds$mean + qnorm(interval[2])*sqrt(loo_preds$sd2)
+    loo_preds$lower95 <- loo_preds$mean + stats::qnorm(interval[1])*sqrt(loo_preds$sd2)
+    loo_preds$upper95 <- loo_preds$mean + stats::qnorm(interval[2])*sqrt(loo_preds$sd2)
   }
 
   loo_preds$truth <- response
@@ -1021,12 +1089,12 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs =
 #'
 #' @param Samples A set of samples from the basis emulator, reconstructed to the original field. Usually the output of `BasisEmSamples()`
 #' @param Truth The corresponding true model outputs, for comparison. Must have an ordering of rows and columns consistent with `Samples` (in terms of input and output locations)
-#' @param locs Indices of locations (across the output field) to average over. Defaults to NULL, which uses all outputs
+#' @param output_inds Indices of locations (across the output field) to average over. Defaults to NULL, which uses all outputs
 #'
 #' @return Validation plot comparing truth and emulator samples
 #'
 #' @export
-ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, locs = NULL, inds = NULL, plot_sum = FALSE){
+ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output_inds = NULL, data_inds = NULL, plot_sum = FALSE){
   
   if (interval <= 0 | interval >= 1){
     stop('interval must be between 0 and 1')
@@ -1034,34 +1102,34 @@ ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, locs =
   
   interval <- c((1-interval)/2, 1 - (1-interval)/2)
   
-  if (is.null(inds)){
-    inds <- 1:nrow(design)
+  if (is.null(data_inds)){
+    data_inds <- 1:nrow(design)
   }
   
   # Predict
-  preds <- Predict(emulator, design[inds,])
+  preds <- Predict(emulator, design[data_inds,])
 
   # Draw samples
   Samples <- BasisEmSamples(preds, DataBasis)
   
   # Construct truth
-  Truth <- DataBasis$CentredField[,inds] + DataBasis$EnsembleMean
+  Truth <- DataBasis$CentredField[,data_inds] + DataBasis$EnsembleMean
   
   ell <- dim(Samples)[1]
   ns <- dim(Samples)[2]
   
   # If not provided with a subset of locations, use all
-  if (is.null(locs)){
-    locs <- 1:ell
+  if (is.null(output_inds)){
+    output_inds <- 1:ell
   }
   
-  # Find average or sum across locs for each sample, run
+  # Find average or sum across output_inds for each sample, run
   if (plot_sum){
-    SamplesSummary <- apply(Samples[locs,,], c(2,3), sum)
+    SamplesSummary <- apply(Samples[output_inds,,], c(2,3), sum)
   }
   
   else {
-    SamplesSummary <- apply(Samples[locs,,], c(2,3), mean)
+    SamplesSummary <- apply(Samples[output_inds,,], c(2,3), mean)
   }
   
   
@@ -1070,11 +1138,11 @@ ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, locs =
   SamplesLower <- apply(SamplesSummary, 2, stats::quantile, prob = interval[1])
   SamplesUpper <- apply(SamplesSummary, 2, stats::quantile, prob = interval[2])
   
-  if (!(nrow(Truth) == length(locs))){
-    Truth <- Truth[locs,]
+  if (!(nrow(Truth) == length(output_inds))){
+    Truth <- Truth[output_inds,]
   }
   
-  if (length(locs) == 1){
+  if (length(output_inds) == 1){
     TruthMean <- Truth
   }
   
