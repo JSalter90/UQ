@@ -16,13 +16,18 @@ Disclaimer (5/8/26): this is still WIP, and some functionality may slightly chan
 
 Load in design, data:
 
-```{r, echo = FALSE, include=FALSE}
-source("~/Dropbox/UQ/package/plot.R")
-source("~/Dropbox/UQ/package/basis.R")
-source("~/Dropbox/UQ/package/emulate.R")
-source("~/Dropbox/UQ/package/calibrate.R")
-load("~/Dropbox/UQ/package/data/SECRET_data.RData")
+```{r, echo = TRUE}
+setwd('..')
+tmp <- getwd()
+source(paste0(tmp, '/plot.R'))
+source(paste0(tmp, '/basis.R'))
+source(paste0(tmp, '/emulate.R'))
+source(paste0(tmp, '/calibrate.R'))
+load(paste0(tmp, '/data/SECRET_data.RData'))
+# Currently need to load ggplot2 explicitly
+library(ggplot2)
 ```
+
 
 Scaling the design to [0,1]:
 
