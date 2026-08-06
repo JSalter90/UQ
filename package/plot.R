@@ -16,7 +16,7 @@
 NULL
 #' 
 #' @export
-PlotBasis <- function(DataBasis, q = 9,  output_inds = NULL){
+PlotBasis <- function(DataBasis, q = 9, output_inds = NULL){
   
   # Dimension of basis
   ell <- nrow(DataBasis$tBasis)
@@ -24,6 +24,10 @@ PlotBasis <- function(DataBasis, q = 9,  output_inds = NULL){
   # If a specific subset hasn't been selected, use all ell dimensions
   if (is.null(output_inds)){
     output_inds <- 1:ell
+  }
+  
+  if (any(output_inds > ell)){
+    stop('Selected output_inds contain indices larger than the size of the data')
   }
   
   # Extract dimension names and locations from DataBasis
@@ -121,6 +125,19 @@ PlotData <- function(DataBasis, AddMean = TRUE, data_inds = NULL, output_inds = 
     output_inds <- 1:ell
   }
   
+  if (any(output_inds > ell)){
+    stop('Selected output_inds contain indices larger than the size of the data')
+  }
+  
+  # If a specific subset hasn't been selected, plot all n outputs in DataBasis$CentredField
+  if (is.null(data_inds)){
+    data_inds <- 1:n
+  }
+  
+  if (any(data_inds > n)){
+    stop('Selected data_inds contain indices larger than the number of available simulations')
+  }
+  
   # Extract dimension names and locations from DataBasis
   input_values <- DataBasis$grid[output_inds,]
   input_names <- colnames(DataBasis$grid)
@@ -133,11 +150,7 @@ PlotData <- function(DataBasis, AddMean = TRUE, data_inds = NULL, output_inds = 
   if (is.null(input_values)){
     input_values <- output_inds
   }
-  
-  if (is.null(data_inds)){
-    data_inds <- 1:n
-  }
-  
+
   if (MeanOnly){
     DataBasis$CentredField <- 0*DataBasis$CentredField
     mu <- DataBasis$EnsembleMean
@@ -145,11 +158,11 @@ PlotData <- function(DataBasis, AddMean = TRUE, data_inds = NULL, output_inds = 
   }
   
   else if (AddMean){
-    mu <- DataBasis$EnsembleMean
+    mu <- DataBasis$EnsembleMean[output_inds]
   }
   
   else {
-    mu <- rep(0, ell)
+    mu <- rep(0, length(output_inds))
   }
   
   # Process obs if provided
@@ -157,7 +170,7 @@ PlotData <- function(DataBasis, AddMean = TRUE, data_inds = NULL, output_inds = 
     Obs <- Obs[output_inds]
     
     if (!(AddMean)){
-      Obs <- Obs - DataBasis$EnsembleMean
+      Obs <- Obs - DataBasis$EnsembleMean[output_inds]
     }
   }
 
@@ -184,7 +197,7 @@ PlotData <- function(DataBasis, AddMean = TRUE, data_inds = NULL, output_inds = 
     if (!(is.null(Obs))){
       Obs <- data.frame(Input = input_values,
                         Output = Obs)
-      plot <- plot + geom_line(data = Obs, aes(x = .data$Input, y = .data$Output), col = cols_validate[3], size = 1.5)
+      plot <- plot + geom_line(data = Obs, aes(x = .data$Input, y = .data$Output), col = cols_validate[2], size = 1.5)
     }
     
   }
@@ -230,7 +243,7 @@ PlotData <- function(DataBasis, AddMean = TRUE, data_inds = NULL, output_inds = 
       Obs <- data.frame(Input = input_values[,1],
                         Variable = input_values[,2],
                         Output = Obs)
-      plot <- plot + geom_line(data = Obs, aes(x = .data$Input, y = .data$Output), col = cols_validate[3], size = 1.5)
+      plot <- plot + geom_line(data = Obs, aes(x = .data$Input, y = .data$Output), col = cols_validate[2], size = 1.5)
     }
   }
   
@@ -333,6 +346,12 @@ PlotResid <- function(DataBasis, obs, q, ...){
 PlotRecon <- function(DataBasis, q = 1, data_inds = 1:16, AddMean = TRUE, residual = FALSE, input_values = NULL, input_name = NULL, output_name = NULL, ...){
   
   ell <- nrow(DataBasis$tBasis)
+  n <- ncol(DataBasis$CentredField)
+  
+  if (any(data_inds > n)){
+    stop('Selected data_inds contain indices larger than the number of available simulations')
+  }
+  
   fields <- DataBasis$CentredField[,data_inds]
   basis <- DataBasis$tBasis[,1:q]
   recons <- ReconField(fields, basis)
@@ -545,6 +564,10 @@ PlotSamples <- function(DataBasis, ems = NULL, design = NULL, samples = NULL, ou
   # If don't provide a subset to plot, use all
   if (is.null(output_inds)){
     output_inds <- 1:ell
+  }
+  
+  if (any(output_inds > ell)){
+    stop('Selected output_inds contain indices larger than the size of the data')
   }
   
   # Extract dimension names and locations from DataBasis
