@@ -68,7 +68,7 @@ FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, o
   }
   
   # Attempt to select columns with too high index
-  if (any(output_cols) > p1){
+  if (any(output_cols > p1)){
     stop('At least one provided index is higher than the number of dimensions of tData, please remove')
   }
   
@@ -885,7 +885,7 @@ ValidateSingle <- function(emulator, valData, interval = 0.95, by_input = FALSE,
       geom_point(col = cols[1]) +
       geom_point(aes(x = .data$ind, y = .data$truth, col = .data$In95)) +
       scale_colour_manual(values = c(cols[2:3])) +
-      labs(y = 'Prediction', x = 'Index', title = paste0('Outside ', 100*interval, '% = ', perc_outside, '%')) +
+      labs(y = 'Prediction', x = 'Index', title = paste0('Outside ', 100*diff(interval), '% = ', perc_outside, '%')) +
       theme_bw() +
       theme(legend.position = 'none')
     
@@ -900,7 +900,7 @@ ValidateSingle <- function(emulator, valData, interval = 0.95, by_input = FALSE,
       geom_point() +
       scale_colour_manual(values = c(cols[2:3])) +
       geom_abline(slope = 1, alpha = 0.6) +
-      labs(y = 'Prediction', x = 'Truth', title = paste0('Outside ', 100*interval, '% = ', perc_outside, '%')) +
+      labs(y = 'Prediction', x = 'Truth', title = paste0('Outside ', 100*diff(interval), '% = ', perc_outside, '%')) +
       theme_bw() +
       theme(legend.position = 'none')
     
@@ -921,7 +921,7 @@ ValidateSingle <- function(emulator, valData, interval = 0.95, by_input = FALSE,
       geom_point(aes(x = .data$value, y = .data$truth, col = .data$In95)) +
       facet_wrap(vars(.data$variable), scales = 'free_x') +
       scale_colour_manual(values = c(cols[2:3])) +
-      labs(y = 'Prediction', x = 'Input', title = paste0('Outside ', 100*interval, '% = ', perc_outside, '%')) +
+      labs(y = 'Prediction', x = 'Input', title = paste0('Outside ', 100*diff(interval), '% = ', perc_outside, '%')) +
       theme_bw() +
       theme(legend.position = 'none')
     
@@ -1045,7 +1045,7 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs =
       geom_point(col = cols[1]) +
       geom_point(aes(x = .data$ind, y = .data$truth, col = .data$In95)) +
       scale_colour_manual(values = c(cols[2:3])) +
-      labs(y = 'Prediction', x = 'Input', title = paste0('Outside ', 100*interval, '% = ', perc_outside, '%')) +
+      labs(y = 'Prediction', x = 'Input', title = paste0('Outside ', 100*diff(interval), '% = ', perc_outside, '%')) +
       theme_bw() +
       theme(legend.position = 'none')
     
@@ -1060,7 +1060,7 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs =
       geom_point() +
       scale_colour_manual(values = c(cols[2:3])) +
       geom_abline(slope = 1, alpha = 0.6) +
-      labs(y = 'Prediction', x = 'Truth', title = paste0('Outside ', 100*interval, '% = ', perc_outside, '%')) +
+      labs(y = 'Prediction', x = 'Truth', title = paste0('Outside ', 100*diff(interval), '% = ', perc_outside, '%')) +
       theme_bw() +
       theme(legend.position = 'none')
     
@@ -1076,12 +1076,6 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs =
 
 
 
-
-
-
-
-# should take inputs instead of predictions?
-# need cleaner way of getting truth
 
 #' Validating predictions based on aggregations
 #'
@@ -1174,7 +1168,7 @@ ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output
     geom_point() +
     scale_colour_manual(values = c(cols[2:3])) +
     ggplot2::geom_abline(slope = 1, alpha = 0.6) +
-    labs(y = 'Prediction', title = paste0('Outside ', 100*interval, '% = ', perc_outside, '%')) +
+    labs(y = 'Prediction', title = paste0('Outside ', 100*diff(interval), '% = ', perc_outside, '%')) +
     theme_bw() +
     theme(legend.position = 'none')
   
