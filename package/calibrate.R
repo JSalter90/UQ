@@ -149,11 +149,10 @@ HistoryMatch <- function(emulator = NULL, design = NULL, DataBasis = NULL, Obs, 
 #' Calculates the implausibility (for the \ell-dimensional field) for a sample of expectations and variances from basis emulators
 #'
 #' @param DataBasis object containing the basis used in emulation ($tBasis)
-#' @param Obs observation vector (length \ell), must be centred
-#' @param Expectation a matrix containing emulator expectations, where a given row contains the expectations for the q emulated basis vectors, for some x
-#' @param Variance a matrix containing emulator variances, where a given row contains the variances for the q emulated basis vectors, for some x
-#' @param Error observation error variance matrix
-#' @param Disc discrepancy variance matrix. Defaults to NULL (zero), as can be included as part of `Error`
+#' @param Obs The observations z, a vector of length l. Should not be centered as this happens internally if required, according to `DataBasis$EnsembleMean`.
+#' @param Predictions Containing components `$Expectation` and `$Variance`, a matrix containing emulator expectations (variances), where a given row contains the expectations for the q emulated basis vectors, for some x
+#' @param ObsVar observation error variance matrix
+#' @param DiscVar discrepancy variance matrix. Defaults to NULL (zero), as can be included as part of `Error`
 #' @param obs_inds If the observation vector is a subset of the full output, selects required indices from full output that correspond to observations. Defaults to NULL (all outputs observed)
 #' @param weightinv if not NULL, the inverse of W = var_err + var_disc, used for projection
 #' #' 
@@ -187,17 +186,16 @@ ImplField <- function(Predictions, DataBasis, Obs, ObsVar, DiscVar = 0, obs_inds
     stop('The observation vector is not the same length as the model output')
   }
   
-  #### problem here if already given as projected ####
   # Centre the observations (if DataBasis was centred)
   Obs <- Obs - DataBasis$EnsembleMean[obs_inds]
   
   # If provided single variance(s), assume iid
   if (length(ObsVar) == 1){
-    ObsVar <- ObsVar*diag(ell)
+    ObsVar <- ObsVar*diag(length(obs_inds))
   }
 
   if (length(DiscVar) == 1){
-    DiscVar <- DiscVar*diag(ell)
+    DiscVar <- DiscVar*diag(length(obs_inds))
   }
   
   W <- ObsVar + DiscVar
@@ -268,11 +266,11 @@ ImplField <- function(Predictions, DataBasis, Obs, ObsVar, DiscVar = 0, obs_inds
 #'
 #' Calculates the coefficient implausibility for a single x, given projected quantities
 #'
-#' @param Expectation length q vector with emulator expectations
-#' @param Variance length q vector with emulator variances
-#' @param Obs vector with projected observations, must be length q
-#' @param ObsVar projected observation error variance matrix, must have dimension qxq
-#' @param DiscVar projected discrepancy variance matrix, must have dimension qxq
+#' @param Expectation length q vector with emulator expectations.
+#' @param Variance length q vector with emulator variances.
+#' @param Obs vector with projected observations, must be the same length as `Expectation` and `Variance`.
+#' @param ObsVar projected observation error variance matrix, must have dimension qxq.
+#' @param DiscVar projected discrepancy variance matrix, must have dimension qxq.
 #'  
 #' @return The coefficient implausibility (given the matrix used in projection)
 #'
