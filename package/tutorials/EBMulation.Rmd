@@ -1,0 +1,692 @@
+---
+title: "UNRISK EBMulation"
+author: "JS, thanks to DW"
+output:
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, cache = TRUE, fig.height = 4)
+```
+
+Reproducing UNRISK training emulation/calibration example.
+
+```{r, echo = TRUE}
+setwd('..')
+tmp <- getwd()
+source(paste0(tmp, '/plot.R'))
+source(paste0(tmp, '/basis.R'))
+source(paste0(tmp, '/emulate.R'))
+source(paste0(tmp, '/calibrate.R'))
+source(paste0(tmp, '/data/EBM.R'))
+# Currently need to load ggplot2 explicitly
+library(ggplot2)
+# FitEmulator options: method = 'gp' or 'dgp' don't work in Rmd, but do in R
+```
+
+Generate initial design on $[0,1]^2$:
+
+```{r}
+set.seed(302)
+n0 <- 12
+X0 <- lhs::maximinLHS(n0, 2)
+head(X0)
+```
+
+Run EBM model at inputs:
+
+```{r}
+ppe <- ebm_output(X0)
+dim(ppe)
+```
+
+The output is 251 (no. of outputs/years) x 12 (no. of simulations).
+
+To plot the data, first process into `DataBasis` object:
+
+```{r}
+DataBasis <- MakeDataBasis(ppe)
+```
+
+It will be helpful for plotting throughout to tag the year information to this object:
+
+```{r}
+DataBasis$grid <- data.frame(Year = years_all)
+```
+
+Now plotting, we see that the x axis is automatically labelled by year:
+
+```{r, fig.height=4}
+ppe_plot <- PlotData(DataBasis) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold")) +
+  labs(col = 'Run', y = 'Temperature anomaly, degC')
+
+ppe_plot
+```
+
+We could instead split this by simulation:
+
+```{r, fig.height=4, fig.width=9}
+ppe_plot + facet_wrap(vars(Run)) + theme(legend.position = 'none')
+```
+
+
+
+## Emulation
+
+First split into a training and validation set, here deliberately withholding one of the more extreme runs:
+
+```{r}
+train_inds <- c(1:9,11)
+val_inds <- c(10,12)
+```
+
+If we want to emulate the full output (1850-2100), there's different ways we could approach this, each with pros and cons.
+
+
+### Emulate all
+
+First emulating all outputs independently:
+
+```{r}
+design <- data.frame(lambda = X0[,1], C = X0[,2])
+
+emulate_all_data <- data.frame(design,
+                               t(ppe))
+
+# Assign more informative column names to the outputs
+colnames(emulate_all_data)[-c(1:2)] <- paste0('T', years_all)
+```
+
+Now emulate all (ignoring 1850 and 1851 as these are always zero across the ensemble):
+
+```{r}
+em_all <- FitEmulators(emulate_all_data[train_inds,], input = 1:2, output_cols = 5:253)
+```
+
+The created `em_all` object is a list of 249 emulators, 1 for each year.
+
+Looking at some validation plots:
+
+```{r}
+loo_all <- LeaveOneOut(em_all[c(which(years_all %in% c(1950,2000,2050,2100)) - 2)], by_index = TRUE)
+```
+
+We can predict across them all at the 2 validation points:
+
+```{r}
+preds <- Predict(em_all, design[val_inds,])
+summary(preds)
+dim(preds$Expectation)
+dim(preds$Variance)
+```
+
+This gives the expectation and variance for each of the 249 emulated years, for each of the 2 validation points.
+
+Generating samples (currently need to construct by hand for this case, might fix later):
+
+```{r, fig.width = 8}
+samples <- array(0, dim = c(length(years_all), 100, 2))
+for (i in 1:length(em_all)){
+  samples[i+2,,1] <- rnorm(100, preds$Expectation[1,i], sd = sqrt(preds$Variance[1,i]))
+  samples[i+2,,2] <- rnorm(100, preds$Expectation[2,i], sd = sqrt(preds$Variance[2,i]))
+}
+PlotSamples(DataBasis, samples = samples, data_inds = val_inds, sample_inds = 1:10)
+```
+
+Pretty good!
+
+Zoom in to better show that there's uncertainty:
+
+```{r, fig.width = 8}
+plot1 <- PlotSamples(DataBasis, samples = samples[,,1], data_inds = val_inds[1], sample_inds = 1:10) +
+  xlim(2050,2100) + ylim(3.5,6)
+plot2 <- PlotSamples(DataBasis, samples = samples[,,2], data_inds = val_inds[2], sample_inds = 1:10) +
+  xlim(2050,2100) + ylim(1.5,2.5)
+cowplot::plot_grid(plot1, plot2)
+```
+
+
+
+### Dimension reduction
+
+The above has worked fairly well, but independence might be a poor assumption for data like this. Clearly neighbouring years have some correlated structure, and the samples from our emulator do not reflect this. If the output dimension is a lot higher than 250, this might become computationally inefficient as well.
+
+Instead, let's consider dimension reduction as a route to emulating the full output. We've already created the `DataBasis` object we need, and plotted the full ensemble. To calculate the basis representation, first the ensemble mean is removed, resulting in the below centered ensemble:
+
+```{r}
+PlotData(DataBasis, AddMean = FALSE) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold")) +
+  labs(col = 'Run', y = 'Temperature anomaly, degC')
+```
+
+The ensemble mean is stored in `DataBasis$EnsembleMean`, and the centered simulations in `DataBasis$CentredField`.
+
+The basis is stored in `DataBasis$tBasis`, and can be similarly plotted:
+
+```{r}
+PlotBasis(DataBasis, q = 6) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold")) +
+  labs(y = 'Weight')
+```
+
+These are the first 6 basis vectors from the SVD of the centered ensemble. By construction, the first explains as much ensemble variability as possible with a single vector, the second explains as much of the remaining variability subject to orthogonality with the previous, and so on.
+
+Here, the first vector explains over 99\% of ensemble variability:
+
+```{r}
+unlist(lapply(1:9, function(k) VarExplained(DataBasis$tBasis[,k], DataBasis$CentredField)))
+```
+
+This suggests that if we can accurately emulate the coefficients given by projection onto this first basis vector, we should get quite a good approximation of the original full series (as this basis vector/coefficients on it represent the majority of variability in the data). This is also fairly clear from the data itself, where we saw that in general, different ensemble members are just shifted up/down in terms of the temperature anomaly, and so all we really need to capture is the size of this shift - which will be described by the leading coefficient.
+
+Usually we'll need more vectors to explain 99\% or even 90\% of the ensemble variability, and it's really dependent on the data (and often the size of the field). However, even here, there seems to be some explainability given by at least the second vector: it seems to capture a feedback due to the volcanic forcings, which is smoothed out in the first vector.
+
+It's usually worth trying to emulate more coefficients than you think you need. Here, we'll try the first 4. If it turns out there's no signal from the inputs on the coefficients for a given vector, that's fine, and in the emulator and later calibration we account for uncertainty on these unemulatable patterns via zero-mean noise terms.
+
+The coefficients given by projections are already calculated:
+
+```{r}
+dim(DataBasis$Coeffs)
+DataBasis$Coeffs[1:10,1:4]
+```
+
+Each row is one of the 12 simulations, each column relates to a basis vector.
+
+Combining these coefficients with the inputs:
+
+```{r, fig.height=3}
+tData_coeffs <- GetEmData(design, DataBasis, q = 4)
+head(tData_coeffs)
+plotC1 <- PlotPair(tData_coeffs, 'lambda', 'C', col = 'C1')
+plotC2 <- PlotPair(tData_coeffs, 'lambda', 'C', col = 'C2')
+cowplot::plot_grid(plotC1,plotC2)
+```
+
+Looks like there might be some smooth relationship between the 2 inputs and each of the leading 2 coefficients (at least).
+
+Alternatively, plotting input vs output:
+
+```{r, fig.height=3}
+PlotPair(tData_coeffs, 'lambda', 'C1', col = 'C2')
+```
+
+
+
+As before, train emulators, now to only the first 4 coefficients:
+
+```{r}
+em_coeffs <- FitEmulators(tData_coeffs[train_inds,], input = 1:2)
+loo_coeffs <- LeaveOneOut(em_coeffs)
+```
+
+The first 3 seem to have some predictive ability. The 4th appears to be noise - each prediction is fairly close to zero, with a similar variance. We can probably not bother emulating this coefficient, and treat it as noise.
+
+Predicting and plotting is easier than before, as `PlotSamples` will do everything internally:
+
+```{r, fig.width = 8}
+PlotSamples(DataBasis, design = tData_coeffs, ems = em_coeffs, data_inds = val_inds, sample_inds = 1:10)
+```
+
+Zooming in as before:
+
+```{r, fig.width = 8}
+plot1 <- PlotSamples(DataBasis, design = tData_coeffs, ems = em_coeffs, data_inds = val_inds[1], sample_inds = 1:10) +
+  xlim(2050,2100) + ylim(3.5,6)
+plot2 <- PlotSamples(DataBasis, design = tData_coeffs, ems = em_coeffs, data_inds = val_inds[2], sample_inds = 1:10) +
+  xlim(2050,2100) + ylim(1.5,2.5)
+cowplot::plot_grid(plot1, plot2)
+```
+
+
+```{r, fig.width = 8}
+plot1 <- PlotSamples(DataBasis, design = tData_coeffs, ems = em_coeffs, data_inds = val_inds[1], sample_inds = 1:10) +
+  xlim(2060,2080) + ylim(3.9,5)
+plot2 <- PlotSamples(DataBasis, design = tData_coeffs, ems = em_coeffs, data_inds = val_inds[2], sample_inds = 1:10) +
+  xlim(2060,2080) + ylim(1.7,2)
+cowplot::plot_grid(plot1, plot2)
+```
+
+
+
+## History matching
+
+Now let's compare to observations.
+
+Because this model is relatively simple, with only 2 inputs, and the emulators are already quite accurate even with only 10 points, as an illustration of the iterative procedure, we'll start with even fewer training points.
+
+### Single output
+
+Imagine we want to calibrate to the present-day temperature (anomaly), a reasonable starting point. Summarising the PPE output across 2016-2025:
+
+```{r}
+temp2025 <- ppe[which(years_all %in% 2016:2025), ]
+temp2025 <- apply(temp2025, 2, mean)
+temp2025
+```
+
+Training an emulator to only the first 4 points:
+
+```{r, results = 'hide',fig.height=3}
+tData2025 <- data.frame(design, temp2025)
+em2025 <- FitEmulators(tData2025[1:4,])
+LeaveOneOut(em2025, by_index = TRUE)
+```
+
+Trained on only 4 points, the emulator is understandably uncertain. It's somewhat hard to judge whether this is a suitable emulator or not, although at least the uncertainty seems quite large, as we'd hope. Training to only 4 points is not a realistic scenario, so let's just treat this as 'fine' and move on.
+
+Given an emulator, we usually want to predict for a large space-filling design in the input space:
+
+```{r}
+set.seed(303)
+Xpred <- lhs::randomLHS(5000, 2)
+colnames(Xpred) <- colnames(design)
+```
+
+To calibrate, we need an observed value, $z$, of the 2016-2025 average temperature anomaly, observation error variance, and discrepancy variance (although in lieu of real observations, we could interpret this procedure as searching for simulations that are within some tolerance of a chosen value $z$. E.g., is it possible for the EBM to produce a present day anomaly of 4 degrees?)
+
+
+```{r}
+hm2025 <- HistoryMatch(emulator = em2025, design = Xpred, Obs = 2.5, ObsVar = 0.01, DiscVar = 0)
+summary(hm2025)
+```
+
+There's several outputs returned by this function:
+
+  * `$Design` is the same as the given design, but with a column appended indicating whether each point is in NROY space or not.
+  
+  * `$Preds` contains the emulator predictions at the given design.
+  
+  * `$Impl`, `$NROY`, `$Pass_kth`, `$Pass_N`, `$inNROY` and `$wave` are relate to the calbration part:
+  
+```{r}
+# Implausibility
+head(hm2025$Impl)
+
+# Proportion of space not ruled out
+hm2025$NROY
+
+# Proportion of space that satisfies the kth constraint. As there's just 1 here, same as $NROY
+hm2025$Pass_kth
+
+# Proportion of space that pass N out of k constraints
+hm2025$Pass_N
+
+# Whether each row of design is in NROY
+head(hm2025$inNROY)
+```
+
+
+Plotting:
+
+```{r}
+PlotNROY(hm2025$Design, k = 1:2) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold")) +
+  geom_point(data = tData2025[1:4,], aes(x = lambda, y = C), col = 'red', size = 3)
+```
+
+We're generally ruled out runs where both `C` and `lambda` are high.
+
+Usually we want to approach the design of new waves in a sensible way. A good starting point is a space-filling sample from NROY space (see function `NewDesign`).
+
+I'm just going to add the 5th and 7th points from our original PPE (based on their inputs, they're fairly central in the current NROY space):
+
+```{r, results='hide'}
+em2025_W2 <- FitEmulators(tData2025[c(1:5,7),])
+LeaveOneOut(em2025_W2, by_index = TRUE)
+```
+
+Instead of providing a large space-filling design, we can instead provide the previous wave, so that we already have a sample from the wave 1 NROY space as a starting point for evaluating the wave 2 emulator:
+
+```{r}
+hm2025_W2 <- HistoryMatch(emulator = em2025_W2, PreviousWave = hm2025, Obs = 2.5, ObsVar = 0.01, DiscVar = 0)
+hm2025_W2$NROY
+```
+
+We've gone from 62\% to 22\% (as our emulator now has much lower variance than before).
+
+Note that `$Design$ now contains 2 columns with NROY indicators, 1 for each wave (where all those with FALSE at wave 1 are necessarily FALSE at wave 2 as well):
+
+```{r}
+head(hm2025_W2$Design)
+```
+
+Re-plotting, it will automatically use the final column as the NROY indicator, hence we get the wave 2 space by default:
+
+```{r}
+PlotNROY(hm2025_W2$Design, k = 1:2) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold")) +
+  geom_point(data = tData2025[c(1:5,7),], aes(x = lambda, y = C), col = 'red', size = 3)
+```
+
+To finish things off more quickly, and to demonstrate other aspects, let's draw a larger number of samples from NROY space, run the EBM at these points, and perform another wave of history matching.
+
+In the output of `hm2025_W2`, we have a set of points that is currently in NROY. Extracting these:
+
+```{r}
+CandPoints <- subset(hm2025_W2$Design, NROY2)
+dim(CandPoints)
+```
+
+This is a set of over 1000 samples from the current NROY space.
+
+Imagine we want to run 10 new simulations of the EBM. We could randomly select 10 points from this NROY space, and in 2D this will probably work fine. We could instead try to select a set of 10 points from the above 1000+ that best spans the NROY space (space-filling):
+
+```{r}
+set.seed(439)
+design_W3 <- NewDesign(CandPoints, n_new = 10)
+design_W3
+```
+
+If we overlay these on the previous NROY plot as triangles:
+
+```{r}
+PlotNROY(hm2025_W2$Design, k = 1:2) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold")) +
+  geom_point(data = tData2025[c(1:5,7),], aes(x = lambda, y = C), col = 'red', size = 3) +
+  geom_point(data = design_W3$design, aes(x = lambda, y = C), col = 'red', size = 3, shape = 17)
+```
+
+By construction, they all lie within the current NROY space, and seem to be relatively space-filling. At least, none of the points are very close to each other, and they cover most areas of space (perhaps a bit of a gap in the top left).
+
+The workflow now requires running new simulatons of the EBM:
+
+```{r}
+ppe_W3 <- ebm_output(design_W3$design)
+dim(ppe_W3)
+
+# Calculating 2016-2025 mean
+temp2025_W3 <- ppe_W3[which(years_all %in% 2016:2025), ]
+temp2025_W3 <- apply(temp2025_W3, 2, mean)
+temp2025_W3
+```
+
+As we would hope, the new simulations cover a narrower range than the entire ensemble spread, and are generally closer to the observations. This should be the case if things have worked as intended: points that are in NROY space should lead to output closer to the observations, unless emulator variance was large.
+
+```{r, results='hide'}
+# Combining output with inputs
+tData2025_W3 <- data.frame(design_W3$design, temp2025_W3)
+
+# Emulation
+em2025_W3 <- FitEmulators(tData2025_W3)
+LeaveOneOut(em2025_W3, by_index = TRUE)
+```
+
+Emulator variance is much lower than previously (note narrower y axis to before). This should usually be the case: as we rule out space/zoom in towards the observations, the subsequent waves have a greater density of training points, and so generally the emulator should be more accurate and confident.
+
+Wave 3 of HM:
+
+```{r}
+hm2025_W3 <- HistoryMatch(emulator = em2025_W3, PreviousWave = hm2025_W2, Obs = 2.5, ObsVar = 0.01, DiscVar = 0)
+hm2025_W3$NROY
+```
+
+Despite a much more accurate emulator, we're 'only' down to 15\% of space:
+
+```{r}
+PlotNROY(hm2025_W3$Design, k = 1:2) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold")) +
+  geom_point(data = tData2025[c(1:5,7),], aes(x = lambda, y = C), col = 'red', size = 3) +
+  geom_point(data = design_W3$design, aes(x = lambda, y = C), col = 'red', size = 3, shape = 17)
+```
+
+However, 6 of the 10 simulations have output within 2SD of the observations, so in fact we're likely just converging to something very close to the 'true' NROY space (i.e., that would be given if we perfectly knew the model output at every input).
+
+Since the EBM is very fast to run, we can illustrate the `true' NROY space by evaluating the EBM at the 5000 points:
+
+```{r}
+ppe_5000 <- ebm_output(Xpred)
+temp2025_5000 <- ppe_5000[which(years_all %in% 2016:2025), ]
+temp2025_5000 <- apply(temp2025_5000, 2, mean)
+```
+
+We can still use the `HistoryMatch` function, by providing `TrueOutput` instead of an emulator:
+
+```{r}
+hm2025_true <- HistoryMatch(emulator = NULL, design = Xpred, TrueOutput = temp2025_5000, Obs = 2.5, ObsVar = 0.01, DiscVar = 0)
+hm2025_true$NROY
+```
+
+The true NROY space consists of 14.9\% of input space, which is extremely similar to our results above using the emulator!
+
+Plotting:
+
+```{r}
+PlotNROY(hm2025_true$Design, k = 1:2) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold"))
+```
+
+
+
+
+### Identifying misspecified errors
+
+As an aside, what happens if we instead set the observation $z$ at, say, 5?
+
+Going back to the original design/emulator:
+
+```{r}
+hm2025_z5 <- HistoryMatch(emulator = em2025, design = Xpred, Obs = 5, ObsVar = 0.01, DiscVar = 0)
+```
+
+Given this observation, and specified error tolerances, everything is ruled out:
+
+```{r}
+hm2025_z5$NROY
+summary(hm2025_z5$Impl)
+```
+
+If we're satisfied the emulator is accurately capturing uncertainty, this result immediately tells us that the model cannot produce $z = 5$ to within the required tolerance.
+
+If this really were the 'observation', and if our observation error variance really were 0.01, ruling everything out tells us about model discrepancy, and that we need to change our assumption about this term, currently (incorrectly) set as zero.
+
+
+
+### Multiple metrics
+
+We can work with multiple outputs/summaries/metrics at the same time in a similar way to the above, calculating the implausibility for each individually, and ruling out inputs based on the k-max implausibility.
+
+The difference between this and the following section is that here the outputs are being treated independently, and we're generally considering a small number of summaries of a larger output field, rather than the full output (and hence independence is less appropriate).
+
+Here, we'll calibrate to the temperature anomaly for a set of years: 1950, 1975, 2000 and 2025. We already have emulators for each of these years, but refitting:
+
+```{r}
+tData_years <- data.frame(design,
+                          t(ppe[which(years_all %in% c(1950,1975,2000,2025)),]))
+colnames(tData_years)[3:6] <- c('T1950', 'T1975', 'T2000', 'T2025')
+em_years <- FitEmulators(tData_years, input = 1:2, output = c('T1950', 'T1975', 'T2000', 'T2025'))
+loo_years <- LeaveOneOut(em_years, by_index = TRUE)
+```
+
+Although there's now 4 outputs being emulated and hence calibrated to, the history matching code is almost identical:
+
+```{r}
+hm_years <- HistoryMatch(emulator = em_years, design = Xpred, Obs = c(0.2,1.2,1.5,2), ObsVar = 0.01, DiscVar = 0)
+summary(hm_years)
+```
+
+All that's changed in the function call is that now `Obs` needs to be a vector of values, corresponding to the emulated outputs. There are some other hidden changes though:
+
+  * `ObsVar` is given as a single value here, which is interpreted as each output has the same observation error variance. In reality this may be different by output, and so this could be provided as a 4-length vector instead.
+  
+  * `DiscVar` works in the same way as `ObsVar`: either needs to be a single, universal value for all outputs, or a specific value for each needs to be given.
+  
+  * An implausibility is now calculated for each row of `Xpred`, for each of the 4 outputs:
+  
+```{r}
+dim(hm_years$Impl)
+head(hm_years$Impl)
+```
+
+  * `$Pass_kth` is now more useful than previously, providing the proportion of inputs that are not ruled out according to each of the 4 metrics individually. This is useful for checking whether there are particular metrics that provide an extremely strong or weak constraint, whether this is because the observations are inconsistent with the model, because emulator variance is extremely large, because the model spread is small relative to the observation error, or some other reason:
+  
+```{r}
+hm_years$Pass_kth
+```
+
+  * Similarly `$Pass_N` is also more useful, as this tells us what proportion of inputs satisfy 0/4, 1/4, 2/4, 3/4 and 4/4 constraints. Here, we see that the best we can do is match 3/4: although each of the 4 metrics can be satisfied by at least 23\% of parameter space, there is no overlap between the 4 individual NROY spaces!
+  
+```{r}
+hm_years$Pass_N
+``` 
+
+And hence:
+
+```{r}
+hm_years$NROY
+```
+
+With multiple outputs, we might instead be more conservative, and instead of requiring all implausibilities to be below 3 to classify a given input as NROY, we could instead use the 2nd max (k max) - which is equivalent to requiring 3/4 to be below 3. Re-running the code with this set as the definition of NROY space, the result should be 8\%:
+
+```{r}
+hm_years <- HistoryMatch(emulator = em_years, design = Xpred, Obs = c(0.2,1.2,1.5,2), ObsVar = 0.01, DiscVar = 0, kmax = 2)
+hm_years$NROY
+```
+
+Perhaps more usefully, we should explore why we can't satisfy all these, e.g., what parts of input space satisfy different constraints? What do simulations look like that fail on 1?
+
+Plotting is done in the same way:
+
+```{r}
+PlotNROY(hm_years$Design, k = 1:2) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold"))
+```
+
+(Looks somewhat similar to the part of parameter space highlighted in the 1D case. This is a coincidence: I chose the 'observations' so that they lie within the ensemble spread, but somewhat at random.)
+
+
+
+### High-dimensional outputs
+
+Instead, we could calculate the multivariate version of the implausibility for the full, higher dimensional output, using the emulators fitted earlier. The emulator variance (when mapped to the original field) is correlated, as seen by the structure of the samples, so we should account for in the implausibility. The observation error and discrepancy covariance matrices may also contain correlations.
+
+
+We need to set observations. Here, I'll choose the 10th member of the original ensemble (which was not used when training the emulators), and add some uncorrelated Gaussian noise. Really should only 'observe' up to the present day (let's call this 2025):
+
+```{r}
+set.seed(548392)
+obs_inds <- which(years_all <= 2025)
+obs <- ppe[obs_inds,10] + rnorm(length(obs_inds), 0, sd = sqrt(0.1))
+```
+
+Adding this curve on top of the ensemble:
+
+```{r}
+PlotData(DataBasis, Obs = obs) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold")) +
+  labs(col = 'Run', y = 'Temperature anomaly, degC')
+```
+
+It looks fairly different from the EBM output, which is smooth except when there is volcanic forcing. However, this sort of noisy curve is much more representative of real observations (see e.g., https://berkeleyearth.org/global-temperature-report-for-2025/).
+
+
+As before, we can use the `HistoryMatch` function to calculate implausibilities for us, given an appropriate emulator and observations (+ errors). We also need to provide a `DataBasis` object that relates to the emulated coefficients:
+
+```{r, eval=FALSE}
+hm_full <- HistoryMatch(emulator = em_coeffs, DataBasis = DataBasis, design = Xpred, Obs = obs, ObsVar = 0.1, DiscVar = 0)
+```
+
+Running this should generate an error, because the dimension of the observations (only up to 2025) is inconsistent with the dimension of the model output (up to 2100).
+
+It's fine to only observe a subset of the full model output, and this might often be the case. All we need to is point to which model output indices the observations correspond to:
+
+```{r}
+hm_full <- HistoryMatch(emulator = em_coeffs, DataBasis = DataBasis, design = Xpred, Obs = obs, ObsVar = 0.1, DiscVar = 0, obs_inds = obs_inds)
+```
+
+Again, I've used a shortcut to define the observation error variance. If given a constant `ObsVar`, the code will assume this means an iid variance across all outputs. Here, iid noise was used to define the observations, so this is consistent.
+
+We could alternatively provide a covariance matrix across the observations. Let's do so, to verify that the code is working as intended:
+
+```{r}
+hm_full_v2 <- HistoryMatch(emulator = em_coeffs, DataBasis = DataBasis, design = Xpred, Obs = obs, ObsVar = 0.1*diag(length(obs)), DiscVar = 0, obs_inds = obs_inds)
+```
+
+The calculated implausibilities should be identical:
+
+```{r}
+summary(hm_full$Impl - hm_full_v2$Impl)
+```
+
+Success!
+
+
+Plotting the NROY space we've defined (now additionally using option `Truth` as we generated the observations using a known simulation of the EBM, so can use these as a check that our NROY space contains the true input setting):
+
+```{r}
+PlotNROY(hm_full$Design, k = 1:2, Truth = design[10,]) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold"))
+```
+
+And it does. We deliberately picked a fairly extreme simulation to base the observations around, so it's not surprising that the NROY is quite small, and towards the corner of parameter space.
+
+We could sample from this NROY space and perform additional waves as before, perhaps adding different observational metrics if they're available. Running the EBM at all of the above samples that are in NROY:
+
+
+```{r}
+ppe_full <- ebm_output(subset(hm_full$Design, NROY1))
+```
+
+Let's process and plot this new set of simulations:
+
+```{r}
+DataBasis_new <- MakeDataBasis(ppe_full)
+DataBasis_new$grid <- DataBasis$grid
+PlotData(DataBasis_new, Obs = obs) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold"),
+        legend.position = 'none') +
+  labs(y = 'Temperature anomaly, degC')
+```
+
+This set of simulations seems to track the observations quite closely (bearing in mind that they are the model output, absent any observational noise).
+
+We could use the ensemble spread for 2026 onwards as a representation of our uncertainty of future temperature: at least, to some extent. It doesn't represent all uncertainty, as it's conditional on a particular volcanic forcing, which is of course itself uncertain.
+
+We could generate more realistic future trajectories by adding observational noise (assuming we're happy to assume this continues to be iid in the future):
+
+```{r}
+ppe_full_noise <- ppe_full + matrix(rnorm(nrow(ppe_full)*ncol(ppe_full), 0, sd = sqrt(0.1)), nrow(ppe_full), ncol(ppe_full))
+DataBasis_noise <- MakeDataBasis(ppe_full_noise)
+DataBasis_noise$grid <- DataBasis$grid
+PlotData(DataBasis_noise, Obs = obs) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold"),
+        legend.position = 'none') +
+  labs(y = 'Temperature anomaly, degC')
+```
+
+Probably a better, less unrealistically-confident set of projections. Still ignoring boundary condition uncertainty, and of course here we've assumed zero discrepancy, which is unlikely the case in real examples, and we'd need to account for this in some way.
+
+Still probably not perfect: tend to underestimate the more recent observations slightly. Is this indicative of a changing trend?
+
+
+
+
