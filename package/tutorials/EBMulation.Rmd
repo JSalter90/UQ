@@ -36,28 +36,36 @@ X0 <- lhs::maximinLHS(n0, 2)
 head(X0)
 ```
 
-Run EBM model at inputs:
+The EBM has 2 inputs: `lambda`, `C`. The simulation model code `ebm_output` converts the given inputss from $[0,1]$ to the required ranges.
+
+Running the EBM at this set of inputs to generate a PPE:
 
 ```{r}
 ppe <- ebm_output(X0)
 dim(ppe)
 ```
 
-The output is 251 (no. of outputs/years) x 12 (no. of simulations).
+The output is 251 (number of outputs, years) x 12 (number of simulations).
 
-To plot the data, first process into `DataBasis` object:
+To use the plotting functionality within the package, we first process the PPE into a `DataBasis` object:
 
 ```{r}
 DataBasis <- MakeDataBasis(ppe)
 ```
 
-It will be helpful for plotting throughout to tag the year information to this object:
+This contains various outputs, most of which we'll use later:
+
+```{r}
+summary(DataBasis)
+```
+
+It will be helpful for plotting throughout to add to the `$grid` slot some information about what set of locations (longitude, latitude, time, etc.) the 251 outputs relate to. Here, the years from 1850-2100:
 
 ```{r}
 DataBasis$grid <- data.frame(Year = years_all)
 ```
 
-Now plotting, we see that the x axis is automatically labelled by year:
+Plotting the PPE, we see that the x axis is automatically labelled by year 1850-2100:
 
 ```{r, fig.height=4}
 ppe_plot <- PlotData(DataBasis) +
@@ -69,7 +77,7 @@ ppe_plot <- PlotData(DataBasis) +
 ppe_plot
 ```
 
-We could instead split this by simulation:
+We could instead split by simulation:
 
 ```{r, fig.height=4, fig.width=9}
 ppe_plot + facet_wrap(vars(Run)) + theme(legend.position = 'none')
@@ -91,33 +99,42 @@ If we want to emulate the full output (1850-2100), there's different ways we cou
 
 ### Emulate all
 
-First emulating all outputs independently:
+First we'll emulate all outputs independently. First doing a bit of processing to create a data frame that, in row $i$, contains the values of `lambda` and `C` for the $i^{th}$ simulation, followed by the temperature anomaly for each year: 
 
 ```{r}
 design <- data.frame(lambda = X0[,1], C = X0[,2])
 
-emulate_all_data <- data.frame(design,
-                               t(ppe))
+# Combine inputs with outputs
+tData_all <- data.frame(design,
+                        t(ppe))
+
+dim(tData_all)
 
 # Assign more informative column names to the outputs
-colnames(emulate_all_data)[-c(1:2)] <- paste0('T', years_all)
+colnames(tData_all)[-c(1:2)] <- paste0('T', years_all)
 ```
 
-Now emulate all (ignoring 1850 and 1851 as these are always zero across the ensemble):
+Using function `FitEmulators` we can loop over all outputs, and train an emulator using `lambda`, `C` as inputs. To do so, we can provide the input and output column indices (alternatively, can provide named columns in option `output`).
+
+Years 1850 and 1851 are exactly zero for all PPE members, so we'll skip those, and train emulators for all years 1852-2100:
 
 ```{r}
-em_all <- FitEmulators(emulate_all_data[train_inds,], input = 1:2, output_cols = 5:253)
+em_all <- FitEmulators(tData_all[train_inds,], input = 1:2, output_cols = 5:253)
 ```
 
-The created `em_all` object is a list of 249 emulators, 1 for each year.
+The `em_all` object is a list of 249 emulators, 1 for each year:
 
-Looking at some validation plots:
+```{r}
+length(em_all)
+```
+
+Looking at a subset of leave-one-out validation plots (where the -2 in the selection of the indices is due to skipping 1850, 1851):
 
 ```{r}
 loo_all <- LeaveOneOut(em_all[c(which(years_all %in% c(1950,2000,2050,2100)) - 2)], by_index = TRUE)
 ```
 
-We can predict across them all at the 2 validation points:
+Prediction can be applied across the full set of emulators, for any given inputs. Here, we'll predict for the 2 points from our validation set so that we can compare to the true simulator output at these inputs:
 
 ```{r}
 preds <- Predict(em_all, design[val_inds,])
@@ -126,9 +143,9 @@ dim(preds$Expectation)
 dim(preds$Variance)
 ```
 
-This gives the expectation and variance for each of the 249 emulated years, for each of the 2 validation points.
+The output here is the expectation and variance for each of the 249 emulated years (columns), for each of the 2 validation points (rows).
 
-Generating samples (currently need to construct by hand for this case, might fix later):
+We could plot the mean and variance, but let's also sample from the emulators, given we have a full distribution (currently need to construct by hand for this case, might fix later):
 
 ```{r, fig.width = 8}
 samples <- array(0, dim = c(length(years_all), 100, 2))
@@ -139,9 +156,7 @@ for (i in 1:length(em_all)){
 PlotSamples(DataBasis, samples = samples, data_inds = val_inds, sample_inds = 1:10)
 ```
 
-Pretty good!
-
-Zoom in to better show that there's uncertainty:
+Broadly, the truth and emulator mean/variance/samples seem to align, but zooming in to 2050 onwards to better compare this, and see that there's uncertainty:
 
 ```{r, fig.width = 8}
 plot1 <- PlotSamples(DataBasis, samples = samples[,,1], data_inds = val_inds[1], sample_inds = 1:10) +
@@ -151,13 +166,16 @@ plot2 <- PlotSamples(DataBasis, samples = samples[,,2], data_inds = val_inds[2],
 cowplot::plot_grid(plot1, plot2)
 ```
 
+It looks like the truth is contained within the 95\% prediction intervals for almost every year. The uncertainty is also relatively low compared to the variability in the output/across the PPE.
+
+A small number of samples (10) are plotted in grey, and these reflect the independence assumption between years, and can be 'spiky'.
 
 
 ### Dimension reduction
 
-The above has worked fairly well, but independence might be a poor assumption for data like this. Clearly neighbouring years have some correlated structure, and the samples from our emulator do not reflect this. If the output dimension is a lot higher than 250, this might become computationally inefficient as well.
+The above has worked fairly well, but independence might be a poor assumption for data like this. Clearly neighbouring years have some correlated structure, and the samples from our emulator do not reflect this. If the output dimension is a lot higher than 250, this approach might become computationally inefficient as well.
 
-Instead, let's consider dimension reduction as a route to emulating the full output. We've already created the `DataBasis` object we need, and plotted the full ensemble. To calculate the basis representation, first the ensemble mean is removed, resulting in the below centered ensemble:
+Instead, let's consider dimension reduction as a route to emulating the full output. We've already created the `DataBasis` object we need, and plotted the full ensemble. To calculate the SVD basis representation, first the ensemble mean is removed, resulting in the below centered ensemble:
 
 ```{r}
 PlotData(DataBasis, AddMean = FALSE) +
@@ -169,7 +187,7 @@ PlotData(DataBasis, AddMean = FALSE) +
 
 The ensemble mean is stored in `DataBasis$EnsembleMean`, and the centered simulations in `DataBasis$CentredField`.
 
-The basis is stored in `DataBasis$tBasis`, and can be similarly plotted:
+The basis is stored in `DataBasis$tBasis`, and can be plotted in a similar way:
 
 ```{r}
 PlotBasis(DataBasis, q = 6) +
@@ -187,9 +205,10 @@ Here, the first vector explains over 99\% of ensemble variability:
 unlist(lapply(1:9, function(k) VarExplained(DataBasis$tBasis[,k], DataBasis$CentredField)))
 ```
 
-This suggests that if we can accurately emulate the coefficients given by projection onto this first basis vector, we should get quite a good approximation of the original full series (as this basis vector/coefficients on it represent the majority of variability in the data). This is also fairly clear from the data itself, where we saw that in general, different ensemble members are just shifted up/down in terms of the temperature anomaly, and so all we really need to capture is the size of this shift - which will be described by the leading coefficient.
 
-Usually we'll need more vectors to explain 99\% or even 90\% of the ensemble variability, and it's really dependent on the data (and often the size of the field). However, even here, there seems to be some explainability given by at least the second vector: it seems to capture a feedback due to the volcanic forcings, which is smoothed out in the first vector.
+This suggests that if we can accurately emulate the coefficients given by projection onto this first basis vector, we should get quite a good approximation of the original full series (as this basis vector/coefficients on it represent the majority of variability in the data). This is also fairly clear from the data itself, where we saw that in general, different ensemble members are just shifted up/down in terms of the temperature anomaly, and so all we really need to capture is the size of this shift dependent on the model inputs - which will be described by the leading coefficient.
+
+Usually we'll need more vectors to explain 99\% or even 90\% of the ensemble variability, and it's really dependent on the data (and often the size of the field). However, even here, there seems to be some explainability given by at least the second vector: it seems to capture a feedback due to the volcanic forcings, which is mostly smoothed out in the first vector. The third may also be capturing some different behaviours around the volcanic forcings, as the spikes seem to align with these.
 
 It's usually worth trying to emulate more coefficients than you think you need. Here, we'll try the first 4. If it turns out there's no signal from the inputs on the coefficients for a given vector, that's fine, and in the emulator and later calibration we account for uncertainty on these unemulatable patterns via zero-mean noise terms.
 
@@ -202,7 +221,7 @@ DataBasis$Coeffs[1:10,1:4]
 
 Each row is one of the 12 simulations, each column relates to a basis vector.
 
-Combining these coefficients with the inputs:
+Combining these coefficients with the inputs, and plotting how the leading coefficients vary in terms of the inputs:
 
 ```{r, fig.height=3}
 tData_coeffs <- GetEmData(design, DataBasis, q = 4)
@@ -212,50 +231,77 @@ plotC2 <- PlotPair(tData_coeffs, 'lambda', 'C', col = 'C2')
 cowplot::plot_grid(plotC1,plotC2)
 ```
 
-Looks like there might be some smooth relationship between the 2 inputs and each of the leading 2 coefficients (at least).
+From this, it appears there might be some smooth relationship between the 2 inputs and each of the leading 2 coefficients (at least), which motivates the use of (D)GPs to predict the coefficients at unseen locations.
 
-Alternatively, plotting input vs output:
+Alternatively, plotting an input vs an output shows there's a clear relationsship between the leading coefficient and `lambda`:
 
 ```{r, fig.height=3}
 PlotPair(tData_coeffs, 'lambda', 'C1', col = 'C2')
 ```
 
-
-
-As before, train emulators, now to only the first 4 coefficients:
+As before, we train emulators, now to the first 4 coefficients (note: we don't need to explicitly provide which columns to emulate here, as the code will automatically search for a column named `C1`, treat this as the first output to emulate, and emulate all subsequent columns):
 
 ```{r}
 em_coeffs <- FitEmulators(tData_coeffs[train_inds,], input = 1:2)
-loo_coeffs <- LeaveOneOut(em_coeffs)
 ```
 
-The first 3 seem to have some predictive ability. The 4th appears to be noise - each prediction is fairly close to zero, with a similar variance. We can probably not bother emulating this coefficient, and treat it as noise.
-
-Predicting and plotting is easier than before, as `PlotSamples` will do everything internally:
-
-```{r, fig.width = 8}
-PlotSamples(DataBasis, design = tData_coeffs, ems = em_coeffs, data_inds = val_inds, sample_inds = 1:10)
+A list of 4 emulators:
+```{r}
+summary(em_coeffs)
 ```
 
-Zooming in as before:
+```{r}
+loo_coeffs <- LeaveOneOut(em_coeffs, by_index = TRUE)
+```
+
+The first 3 emulators seem to have some predictive ability. The 4th appears to be noise - each prediction is fairly close to zero, with a similar variance. We can probably not bother emulating this coefficient, and treat it as noise.
+
+Predicting and plotting is easier than before, as `PlotSamples` will do everything internally, given an emulator to use for prediction, a basis, and a design to predict at. As before, we're predicting and sampling for the 2 validation points, indicated by `data_inds = val_inds`:
 
 ```{r, fig.width = 8}
-plot1 <- PlotSamples(DataBasis, design = tData_coeffs, ems = em_coeffs, data_inds = val_inds[1], sample_inds = 1:10) +
+PlotSamples(DataBasis, design = tData_coeffs, emulator = em_coeffs, data_inds = val_inds, sample_inds = 1:10)
+```
+
+Zooming in as before, we see broadly similar behaviour, although now the samples are smoother / look more like realisations of the EBM simulator itself. This is because the sampling is now on the coefficient level, with each sample of coefficients then mapped through the basis to produce the full 1850-2100 curve, and hence each sample incorporates the patterns from the basis/EBM:
+
+```{r, fig.width = 8}
+plot1 <- PlotSamples(DataBasis, design = tData_coeffs, emulator = em_coeffs, data_inds = val_inds[1], sample_inds = 1:10) +
   xlim(2050,2100) + ylim(3.5,6)
-plot2 <- PlotSamples(DataBasis, design = tData_coeffs, ems = em_coeffs, data_inds = val_inds[2], sample_inds = 1:10) +
+plot2 <- PlotSamples(DataBasis, design = tData_coeffs, emulator = em_coeffs, data_inds = val_inds[2], sample_inds = 1:10) +
+  xlim(2050,2100) + ylim(1.5,2.5)
+cowplot::plot_grid(plot1, plot2)
+```
+
+For a direct comparison, plotting the 2 alongside each other. 1st validation point:
+
+```{r, fig.width = 8}
+plot1 <- PlotSamples(DataBasis, samples = samples[,,1], data_inds = val_inds[1], sample_inds = 1:10) +
+  xlim(2050,2100) + ylim(3.5,6)
+plot2 <- PlotSamples(DataBasis, design = tData_coeffs, emulator = em_coeffs, data_inds = val_inds[1], sample_inds = 1:10) +
+  xlim(2050,2100) + ylim(3.5,6)
+cowplot::plot_grid(plot1, plot2)
+```
+
+2nd validation point:
+
+```{r, fig.width = 8}
+plot1 <- PlotSamples(DataBasis, samples = samples[,,2], data_inds = val_inds[2], sample_inds = 1:10) +
+  xlim(2050,2100) + ylim(1.5,2.5)
+plot2 <- PlotSamples(DataBasis, design = tData_coeffs, emulator = em_coeffs, data_inds = val_inds[2], sample_inds = 1:10) +
   xlim(2050,2100) + ylim(1.5,2.5)
 cowplot::plot_grid(plot1, plot2)
 ```
 
 
-```{r, fig.width = 8}
-plot1 <- PlotSamples(DataBasis, design = tData_coeffs, ems = em_coeffs, data_inds = val_inds[1], sample_inds = 1:10) +
-  xlim(2060,2080) + ylim(3.9,5)
-plot2 <- PlotSamples(DataBasis, design = tData_coeffs, ems = em_coeffs, data_inds = val_inds[2], sample_inds = 1:10) +
-  xlim(2060,2080) + ylim(1.7,2)
-cowplot::plot_grid(plot1, plot2)
-```
+Broadly, the mean and uncertainty are similar, with the difference between the samples addressed above. There's some interesting differences:
 
+  * For 2080 onwards (i.e., beyond any effects of volcanic forcing), the 'emulate all' approach has lower uncertainty.
+  
+  * Around the volcanic forcings, the basis approach has lower uncertainty.
+  
+This is not too surprising: if they only information we have is a particular year, where there's both signal from the model inputs and some volcanic event, the response being noisier seems reasonable. However, the basis approach is able to capture this more accurately (partly because being handled separately to the main signal, via `C2`, `C3`, so easier to capture specific effects from the inputs relating to this; and partly because there may be information across different years that give information about the volcanic feedbacks - which is shown by the relationship in the 2nd, 3rd basis vectors).
+
+Once the volcanic signal has dampened and all the temperature signal is coming from `lambda`, `C` again, emulating a specific year only is unsurprisingly better (basis approach has fewer degrees of freedom, only 4 GPs), but with the trade-off that do worse when there is useful information from other years, and that don't have realistic-lokking samples from the emulator.
 
 
 ## History matching
