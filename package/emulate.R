@@ -7,28 +7,26 @@ cols_validate <- c('darkgrey', viridis::viridis(100)[31], viridis::viridis(100)[
 
 cols_good <- viridis::viridis(100)[65]
 
-
-
-# Need to handle presence (or not) of noise
-
-#' Fitting emulators
+#' Training emulators
 #' 
-#' A function for fitting 1 or more emulators
+#' A function for fitting 1 or more emulators.
+#'
+#' The default behaviour is to fit a single emulator, with output given by the final column of `tData`, and all preceding columns assumed as inputs.
 #' 
-#' Probably simplify the names, no need for emulate_
+#' The exception is if a column named C1 is found. If this exists, then this output and all subsequent columns are emulated, using all columns prior to C1 as inputs.
 #' 
-#' By default, searches for a column named C1. If finds, emulates this and all subsequent columns
-#' Otherwise emulates final
-#' By default, uses all columns prior to first emulated column as inputs
+#' This default behaviour can be overriden by explicitly providing which columns relate to inputs and/or outputs.
 #' 
-#' @param tData a data frame containing, at a minimum, the design and output(s) to be emulated. May also contain a noise column. May be the output of `ProcessData`, but could be created by hand.
-#' @param method
-#' @param inputs
-#' @param output which column names to fit emulators for. Defaults to NULL, in which case emulates the final column of `tData` only
-#' @param output_cols which column indices to fit emulators for. Defaults to NULL, in which case emulates the final column of `tData` only
-#' @param ... arguments for `BuildGasp`, `BuildHet`, `BuildGP` or `BuildDGP`
+#' @param tData A data frame containing the training data, with column(s) relating to all inputs and all outputs to be emulated. May also contain a noise column. May be the output of `ProcessData`.
+#' @param method Which method to use for fitting the emulator(s). Defaults to rgasp `RobustGaSP`. Other options hetGP, gp, dgp (both use `dgpsi`).
+#' @param input Column indices corresponding to emulator inputs. Defaults to `NULL`, in which case all columns prior to the first output column are assumed to be inputs.
+#' @param output Column names corresponding to emulator outputs. Defaults to `NULL`, in which case either a column named C1 and all subsequent columns are emulated, or only the final column of `tData` is emulated.
+#' @param output_cols Column indices corresponding to emulator outputs. Defaults to `NULL`, in which case behaves as `output`.
+#' @param covariance Covariance function. Defaults to `matern5_2`.
+#' @param nugget Logical, whether to estimate a nugget. Defaults to `TRUE`.
+#' @param ... arguments for `BuildGasp`, `BuildHet`, `BuildGP` or `BuildDGP`.
 #' 
-#' @return A list of emulators
+#' @returns A list of emulators. See [BuildGasp()], [BuildHet()], [BuildGP()], [BuildDGP()] for the specific output given by each emulator type.
 #' 
 #' @export
 FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, output_cols = NULL, 
@@ -36,6 +34,23 @@ FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, o
   
   n <- nrow(tData)
   p1 <- ncol(tData)
+  
+  # If provided both output and output_cols, check these are consistent
+  if (!(is.null(output)) & !(is.null(output_cols))){
+    
+    if (!(length(output) == length(output_cols))){
+      stop('output and output_cols have different length, please provide consistent names/indices, or provide only one of these')
+    }
+    
+    else {
+      output1 <- sort(output)
+      output2 <- sort(colnames(tData)[output_cols])
+      if (!(all(output1 == output2))){
+        stop('Inconsistent outputs selected by output and output_cols, please provide consistent names/indices, or provide only one of these')
+      }
+      rm(output1, output2)
+    }
+  }
   
   # If nothing specific provided, first search for column named C1, and emulate this and all subsequent columns
   if (is.null(output_cols) & is.null(output)){
@@ -144,19 +159,21 @@ FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, o
 }
 
 
-
-
-
-
-#' Refit and replace specific emulator in a list of emulators (e.g., with different assumptions)
+#' Replacing an emulator in a list
+#' 
+#' Retrains and replaces a specific emulator in a list of emulators (e.g., with a different emulator method or assumptions used).
 #'
+#' By default, uses the same set of inputs as the original emulator (as only these are stored in the training data). To override this, a different training dataset can be provided here.
 #'
-#' @param emulators 
-#' @param Response 
-#' @param tData defaults to NULL, in which case inherits training data from the previously fitted emulator. Can provide different set of inputs here.
-#' @param method 
-#' @param ... 
-#'
+#' @param emulators A list of emulators, likely the output of [FitEmulators()].
+#' @param Response The name of the output to be emulated.
+#' @param tData A data frame containing the training data, with column(s) relating to all inputs and a column for the output to be emulated. Defaults to `NULL`, in which case inherits the training data from the previously fitted emulator. Can provide different set of inputs here.
+#' @param method Which method to use for fitting the emulator(s). Defaults to rgasp `RobustGaSP`. Other options hetGP, gp, dgp (both use `dgpsi`).
+#' @param ... Other options to pass to [FitEmulators()].
+#' 
+#' @returns A list of emulators, with the emulator relating to `Response` replaced with the new fitted emulator.
+#' 
+#' @export
 RefitEmulator <- function(emulators, Response, tData = NULL, method = 'rgasp', ...){
   
   k <- length(emulators)
@@ -185,18 +202,22 @@ RefitEmulator <- function(emulators, Response, tData = NULL, method = 'rgasp', .
 
 
 
+#### DF vs matrix ####
 
 #' Scale design
 #' 
-#' @param design 
-#' @param InputRanges 
-#' @param range 
+#' Scales input vectors to a common range.
 #' 
-#' @returns description
+#' @param design Design to be scaled, where each row as an input vector, each column is a particular input. The column names need to match with those provided in `InputRanges`.
+#' @param InputRanges Matrix or data frame providing input ranges. Should contain 3 columns (name, minimum value, maximum value) which can have any names, with each row corresponding to a different input parameter.
+#' @param range The range to scale inputs to. Defaults to (0,1).
+#' 
+#' @returns Scaled design, with same dimension as provided design.
 #' 
 ScaleInputs <- function(design, InputRanges, range = c(0,1)){
   
   # Rename columns
+  InputRanges <- as.data.frame(InputRanges)
   colnames(InputRanges) <- c('Input', 'Min', 'Max')
   
   # Check all provided
@@ -221,14 +242,15 @@ ScaleInputs <- function(design, InputRanges, range = c(0,1)){
 }
 
 
-
-
 #' Unscale design
 #' 
-#' @param scaled_design 
-#' @param InputRanges 
-#' @param range 
+#' Unscales input vectors to their original range.
 #' 
+#' @param scaled_design The scaled design to be unscaled.
+#' @param InputRanges Matrix or data frame providing input ranges. Should contain 3 columns (name, minimum value, maximum value) which can have any names, with each row corresponding to a different input parameter.
+#' @param range The range the scaled inputs are on. Defaults to (0,1).
+#' 
+#' @returns Unscaled design, with same dimension as provided design.
 #' 
 UnscaleInputs <- function(scaled_design, InputRanges, range = c(0,1)){
   
@@ -299,7 +321,7 @@ TrainTestSplit <- function(data, train = 0.75, seed = NULL){
 #' @param tData data frame containing (in order): a) the design, b) a column containing noise, c) the basis coefficients
 #' @param ... other arguments to pass to `mleHetGP`
 #'
-#' @return \item{em}{An HetGP emulator}
+#' @returns \item{em}{An HetGP emulator}
 #' \item{type}{Label indicating that the emulator was fitted with HetGP}
 #' \item{train_data}{The subset of the data that was used to fit the emulator}
 #' \item{validation_data}{The subset of the data that was not used. If training_prop = 1, this is empty}
@@ -374,7 +396,7 @@ BuildHet <- function(Response, tData, input = NULL, covariance = 'Matern5_2', ..
 #' @param nugget_fit should a nugget be estimated? Defaults to TRUE
 #' @param maxdf maximum number of terms allowed in the mean function, if step used. Defaults to 0.1*size of training data
 #' 
-#' @return \item{em}{An rgasp emulator}
+#' @returns \item{em}{An rgasp emulator}
 #' \item{em_lm}{If mean_fn = 'step', the regression model that was fitted}
 #' \item{active}{If mean_fn = 'step', the variables that were deemed to be active}
 #' \item{type}{Label indicating that the emulator was fitted with rgasp}
@@ -466,7 +488,7 @@ BuildGasp <- function(Response, tData, input = NULL, mean_fn = NULL, linModel = 
 #' @param nugget 
 #' @param ... 
 #'
-#' @return
+#' @returns
 #' @export
 #'
 #' @examples
@@ -515,7 +537,7 @@ BuildGP <- function(Response, tData, input = NULL, covariance = 'matern5_2', nug
 #' @param covariance 
 #' @param ... 
 #'
-#' @return
+#' @returns description
 #' @export
 #'
 #' @examples
@@ -609,7 +631,7 @@ Predict <- function(emulator, design){
 #' @param emulator 
 #' @param design 
 #'
-#' @return
+#' @returns
 #' @export
 #'
 #' @examples
@@ -655,7 +677,7 @@ PredictSingle <- function(emulator, design){
 #' @param emulator an object output by BuildHet
 #' @param design a data frame containing the input parameters, where each row is a point at which to evaluate the emulator
 #'
-#' @return an object containing the mean, variance (with nugget removed), and nugget variance, at each input location
+#' @returns an object containing the mean, variance (with nugget removed), and nugget variance, at each input location
 #'
 #' @export
 PredictHet <- function(emulator, design){
@@ -676,7 +698,7 @@ PredictHet <- function(emulator, design){
 #' @param emulator 
 #' @param design 
 #'
-#' @return
+#' @returns
 #' @export
 #'
 #' @examples
@@ -703,7 +725,7 @@ PredictDGP <- function(emulator, design){
 #' @param Design a data frame containing the input parameters, where each row is a point at which to evaluate the emulator
 #' @param emulator an object output by BuildGasp (requires mean_fn, active etc.)
 #' 
-#' @return an object containing the mean, standard deviation, and lower and upper bounds of the 95% posterior credible interval (see predict,rgasp-method)
+#' @returns an object containing the mean, standard deviation, and lower and upper bounds of the 95% posterior credible interval (see predict,rgasp-method)
 #' 
 #' @export
 PredictGasp <- function(emulator, design){
@@ -773,7 +795,7 @@ PredictGasp <- function(emulator, design){
 #' @param by_index 
 #' @param Obs 
 #'
-#' @return
+#' @returns
 #' @export
 #'
 #' @examples
@@ -823,7 +845,7 @@ Validate <- function(emulator, valData, interval = 0.95, by_input = FALSE, by_in
 #' @param valData a validation data frame containing inputs and true output
 #' @param IndivPars Create plots for each input
 #'
-#' @return an object containing the mean, variance (with nugget removed), and nugget variance, at each input location
+#' @returns an object containing the mean, variance (with nugget removed), and nugget variance, at each input location
 #'
 #' @export
 ValidateSingle <- function(emulator, valData, interval = 0.95, by_input = FALSE, by_index = FALSE, Obs = NULL){
@@ -953,7 +975,7 @@ ValidateSingle <- function(emulator, valData, interval = 0.95, by_input = FALSE,
 #' @param Obs 
 #' @param ... 
 #'
-#' @return
+#' @returns
 #' @export
 #'
 #' @examples
@@ -994,7 +1016,7 @@ LeaveOneOut <- function(emulator, interval = 0.95, Obs = NULL, ...){
 #' 
 #' @param emulator 
 #' 
-#' @return 
+#' @returns description
 #' 
 #' @export
 LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs = NULL){
@@ -1085,7 +1107,7 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs =
 #' @param Truth The corresponding true model outputs, for comparison. Must have an ordering of rows and columns consistent with `Samples` (in terms of input and output locations)
 #' @param output_inds Indices of locations (across the output field) to average over. Defaults to NULL, which uses all outputs
 #'
-#' @return Validation plot comparing truth and emulator samples
+#' @returns Validation plot comparing truth and emulator samples
 #'
 #' @export
 ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output_inds = NULL, data_inds = NULL, plot_sum = FALSE){
