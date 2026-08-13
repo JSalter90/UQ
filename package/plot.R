@@ -498,24 +498,29 @@ PlotRecon <- function(DataBasis, q = 1, data_inds = 1:16, AddMean = TRUE, residu
 #'
 #' Takes samples (or a summary of these) from BasisEmSamples and plots, adds the truth if this is provided
 #'
-#' @param Samples 
-#' @param inds 
-#' @param Truth 
-#' @param input_values 
-#' @param input_name 
 #' @param output_name 
 #' @param sample_inds Only plot a subset of the provided samples. Still uses all samples to calculate mean/95%.
+#' @param DataBasis 
+#' @param emulator 
+#' @param design 
+#' @param samples 
+#' @param data_inds 
+#' @param output_inds 
+#' @param interval 
+#' @param AddMean 
+#' @param Obs 
+#' @param ... 
 #' 
 #' @return 
 #' @import ggplot2
 #' 
 #' @export
-PlotSamples <- function(DataBasis, ems = NULL, design = NULL, samples = NULL, output_name = NULL, data_inds = NULL, sample_inds = NULL, output_inds = NULL, interval = 0.95, AddMean = TRUE, Obs = NULL,...){
+PlotSamples <- function(DataBasis, emulator = NULL, design = NULL, samples = NULL, output_name = NULL, data_inds = NULL, sample_inds = NULL, output_inds = NULL, interval = 0.95, AddMean = TRUE, Obs = NULL,...){
 
-  # Various combinations of design, samples, ems can be provided
+  # Various combinations of design, samples, emulator can be provided
   if (!(is.null(design)) & is.null(samples) & !(is.null(data_inds))){  
     # Generate emulator predictions at required locations only
-    preds <- Predict(ems, design[data_inds,])
+    preds <- Predict(emulator, design[data_inds,])
     # Draw samples
     Samples <- BasisEmSamples(preds, DataBasis, AddMean = AddMean, ...)
   }
@@ -526,7 +531,7 @@ PlotSamples <- function(DataBasis, ems = NULL, design = NULL, samples = NULL, ou
   
   # If data_inds not provided, use all of design
   else if (is.null(samples) & is.null(data_inds)){
-    preds <- Predict(ems, design)
+    preds <- Predict(emulator, design)
     Samples <- BasisEmSamples(preds, DataBasis, AddMean = AddMean, ...)
   }
   
