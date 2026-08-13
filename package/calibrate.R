@@ -22,6 +22,7 @@
 #' @param Obs The observations. Can be a single value or a vector. Its length needs to either match the number of emulators (1D implausibility case), the number of columns provided in `TrueOutput`, or the dimension l of the basis vectors in `DataBasis$tBasis`.
 #' @param ObsVar Observation error variance matrix. If a single value is provided, assumes the observation error is constant and uncorrelated across all outputs provided in `Obs`. In the case of l independent outputs, can be provided as a vector of length l. In the case of the multivariate implausibility, needs to be an lxl matrix.
 #' @param DiscVar Discrepancy variance matrix. Defaults to zero as it is possible to set `ObsVar` as the sum of the observation error variance and the discrepancy variance, given that internally these two terms are treated independently and summed. The same rules apply as for providing `ObsVar`. 
+#' @param obs_inds If the observation vector is a subset of the full output as contained in `DataBasis$tBasis`, this selects the indices from the full output that correspond to observations. Defaults to `NULL`, which corresponds to all outputs observed.
 #' @param TrueOutput The actual simulator output corresponding to `design`, so that the 'true' implausibility (i.e., with the exact output and zero variance) is calculated. Defaults to `NULL`. If provided, number of columns needs to be consistent with length of `Obs`.
 #' @param PreviousWave The previous wave of history matching, containing a set of points that are in the current NROY space. Should be the output of a previous evaluation of `HistoryMatch`, or contain the same fields.
 #' @param ... kmax, etc.
@@ -37,7 +38,7 @@
 #' \item{wave}{The current wave number. Set to 1 if `PreviousWave` was not provided, else adds 1 to `PreviousWave$wave`.}
 #' 
 #' @export
-HistoryMatch <- function(emulator = NULL, design = NULL, DataBasis = NULL, Obs, ObsVar, DiscVar = 0, TrueOutput = NULL, PreviousWave = NULL, ...){
+HistoryMatch <- function(emulator = NULL, design = NULL, DataBasis = NULL, Obs, ObsVar, DiscVar = 0, obs_inds = NULL, TrueOutput = NULL, PreviousWave = NULL, ...){
   
   # If emulator not provided, must have been given TrueOutput, check
   if (is.null(emulator)){
@@ -114,9 +115,15 @@ HistoryMatch <- function(emulator = NULL, design = NULL, DataBasis = NULL, Obs, 
     preds$Expectation <- TrueOutput
     preds$Variance <- 0*TrueOutput
   }
+  
+  # If a subset is not selected, use all outputs
+  if (is.null(obs_inds) & Multivariate){
+    ell <- ifelse(!(is.null(DataBasis)), nrow(DataBasis$tBasis), ncol(TrueOutput))
+    obs_inds <- 1:ell
+  }
 
   if (Multivariate){
-    impl <- ImplField(preds, DataBasis, Obs = Obs, ObsVar = ObsVar, DiscVar = DiscVar, ...)
+    impl <- ImplField(preds, DataBasis, Obs = Obs, ObsVar = ObsVar, DiscVar = DiscVar, obs_inds = obs_inds, ...)
   }
   
   else {
@@ -166,7 +173,7 @@ HistoryMatch <- function(emulator = NULL, design = NULL, DataBasis = NULL, Obs, 
 #' @param Obs The observations z, a vector of length l. Should not be centered as this happens internally if required, according to `DataBasis$EnsembleMean`.
 #' @param ObsVar Observation error variance matrix. If a single value is provided, assumes the observation error is constant and uncorrelated across all outputs provided in `Obs`. In the case of l independent outputs, can be provided as a vector of length l. In the case of the multivariate implausibility, needs to be an lxl matrix.
 #' @param DiscVar Discrepancy variance matrix. Defaults to zero as it is possible to set `ObsVar` as the sum of the observation error variance and the discrepancy variance, given that internally these two terms are treated independently and summed. The same rules apply as for providing `ObsVar`. 
-#' @param obs_inds If the observation vector is a subset of the full output, selects required indices from full output that correspond to observations. Defaults to NULL (all outputs observed)
+#' @param obs_inds If the observation vector is a subset of the full output as contained in `DataBasis$tBasis`, this selects the indices from the full output that correspond to observations. Defaults to `NULL`, which corresponds to all outputs observed.
 #' @param weightinv If not NULL, the inverse of W = var_err + var_disc, used for projection
 #' @param BasisUncertainty Whether to include the variance from deleted basis vectors. Defaults to `TRUE`.
 #' 
@@ -286,15 +293,15 @@ ImplField <- function(Predictions, DataBasis, Obs, ObsVar, DiscVar = 0, obs_inds
 
 #' Coefficient implausibility
 #'
-#' Calculates the coefficient implausibility for a single x, given projected quantities
+#' Calculates the coefficient implausibility for a single input vector x, given projected observations and error matrices.
 #'
-#' @param Expectation length q vector with emulator expectations.
-#' @param Variance length q vector with emulator variances.
-#' @param Obs vector with projected observations, must be the same length as `Expectation` and `Variance`.
-#' @param ObsVar projected observation error variance matrix, must have dimension qxq.
-#' @param DiscVar projected discrepancy variance matrix, must have dimension qxq.
+#' @param Expectation Length q vector with emulator expectations.
+#' @param Variance Length q vector with emulator variances.
+#' @param Obs Vector of projected observations, must be the same length as `Expectation` and `Variance`.
+#' @param ObsVar Projected observation error variance matrix, must have dimension qxq.
+#' @param DiscVar Projected discrepancy variance matrix, must have dimension qxq.
 #'  
-#' @return The coefficient implausibility (given the matrix used in projection)
+#' @returns The coefficient implausibility.
 #'
 #' @export
 ImplCoeff <- function(Expectation, Variance, Obs, ObsVar, DiscVar){
@@ -308,11 +315,11 @@ ImplCoeff <- function(Expectation, Variance, Obs, ObsVar, DiscVar){
   }
   
   if (!(length(Expectation) == nrow(ObsVar))){
-    stop('Emulator expectation and projected observation error matrix have inconsistent dimensions')
+    stop('Emulator expectation and projected observation error matrix have different dimensions')
   }
   
   if (!(length(Expectation) == nrow(DiscVar))){
-    stop('Emulator expectation and projected discrepancy matrix have inconsistent dimensions')
+    stop('Emulator expectation and projected discrepancy matrix have different dimensions')
   }
   
   V <- ObsVar + DiscVar + diag(Variance)
@@ -335,7 +342,7 @@ ImplCoeff <- function(Expectation, Variance, Obs, ObsVar, DiscVar){
 #' @param ObsVar Observation error variance matrix. If a single value is provided, assumes the observation error is constant and uncorrelated across all outputs provided in `Obs`.
 #' @param DiscVar Discrepancy variance matrix. Defaults to zero as it is possible to set `ObsVar` as the sum of the observation error variance and the discrepancy variance, given that internally these two terms are treated independently and summed. The same rules apply as for providing `ObsVar`. 
 #'
-#' @return
+#' @returns Implausibility for each given output.
 #' @export
 #'
 #' @examples
@@ -446,7 +453,7 @@ ImplFieldRecon <- function(Predictions, DataBasis, Obs, ObsVar, DiscVar = 0){
 #' @param level quantile of the chi-squared distribution to use (< 0.995)
 #' @param weightinv inverse of W, to use in projection
 #'  
-#' @return scalar to be used as discrepancy multiplier, to ensure observations not ruled out
+#' @returns scalar to be used as discrepancy multiplier, to ensure observations not ruled out
 #'
 #' @export
 SetDiscrepancy <- function(Basis, q, obs, level = 0.95, weightinv = NULL){
@@ -466,7 +473,7 @@ SetDiscrepancy <- function(Basis, q, obs, level = 0.95, weightinv = NULL){
 #' @param q - where the basis is truncated
 #' @param weightinv inverse of W, to use in projection
 #' 
-#' @return Matrix containing uncertainty due to basis truncation
+#' @returns Matrix containing uncertainty due to basis truncation
 #' 
 #' @export
 DiscardedBasisVariance <- function(DataBasis, q, weightinv = NULL){
@@ -484,7 +491,7 @@ DiscardedBasisVariance <- function(DataBasis, q, weightinv = NULL){
 #' @param x A vector.
 #' @param k Which maximum to find.
 #'
-#' @return The kth maximum.
+#' @returns The kth maximum.
 #' @export
 #'
 #' @examples
@@ -501,7 +508,7 @@ kth_max <- function(x,k) {
 #' @param impl Matrix of implausibilities, with each row corresponding to an input vector, and each column corresponding to an output.
 #' @param bound Threshold to use for defining NROY space. Defaults to 3.
 #'
-#' @return Proportion of inputs that are in NROY according to each of the given outputs.
+#' @returns Proportion of inputs that are in NROY according to each of the given outputs.
 #' @export
 #'
 #' @examples
@@ -518,7 +525,7 @@ pass_kth_metric <- function(impl, bound = 3){
 #' @param impl Matrix of implausibilities, with each row corresponding to an input vector, and each column corresponding to an output.
 #' @param bound Threshold to use for defining NROY space. Defaults to 3.
 #'
-#' @return Proportion of inputs that satisfy N = 0,1,...k of the k constraints.
+#' @returns Proportion of inputs that satisfy N = 0,1,...k of the k constraints.
 #' @export
 #'
 #' @examples
@@ -540,7 +547,7 @@ pass_metric <- function(impl, bound = 3){
 #' @param kmax Which kth-max implausibility to use to define NROY space. Defaults to 1 (i.e. use the maximum implausibility across all outputs to classify an input).
 #' @param bound Threshold to use for defining NROY space. Defaults to 3.
 #'
-#' @return \item{Impl}{The implausibility for each input, corresponding to the rows of `design`. If calculating multiple implausibilities, output is a matrix with the corresponding number of columns.}
+#' @returns \item{Impl}{The implausibility for each input, corresponding to the rows of `design`. If calculating multiple implausibilities, output is a matrix with the corresponding number of columns.}
 #' \item{NROY}{The proportion of points that are in NROY space.}
 #' \item{inNROY}{A logical vector indicating which points are in NROY space.}
 #' \item{Pass_kth}{The proportion of points that are in each marginal NROY, i.e. according to each observation independently.}
@@ -642,8 +649,9 @@ Impl1D <- function(expectation, variance, Obs, ObsVar, DiscVar = 0){
 #' @param n_new The size of the new design.
 #' @param reps How many sample designs to assess. Defaults to 100.
 #'
-#' @return \item{design}{The selected space-filling design.}
+#' @returns \item{design}{The selected space-filling design.}
 #' \item{inds}{Indices relating to which rows of `CandidatePoints` were selected.}
+#' 
 #' @export
 #'
 #' @examples
@@ -695,7 +703,7 @@ NewDesign <- function(CandidatePoints, n_new, reps = 100){
 #' @param DataBasis object from previous wave
 #' @param Obs centred observation from previous wave
 #' 
-#' @return \item{Design}{Design with new wave, followed by any NROY runs from previous waves}
+#' @returns \item{Design}{Design with new wave, followed by any NROY runs from previous waves}
 #' \item{DataBasis}{Basis, centred data, and ensemble mean for the new ensemble combined with previous NROY runs}
 #' \item{Obs}{Centred observations, given new ensemble mean} 
 #' 
@@ -721,7 +729,7 @@ AddPreviousNROY <- function(DesignHM, NewDesign, NewData, DataBasis, Obs, ...){
 #' @param Truth 
 #' @param size Controlling size of points on lower half of plot
 #'
-#' @return
+#' @returns
 #' @export
 #'
 #' @examples
