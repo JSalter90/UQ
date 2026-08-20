@@ -11,7 +11,7 @@
 #' @param RemoveMean if TRUE, centres the data prior to calculating the basis
 #' @param StoreEigen if TRUE, stores Q, lambda from eigendecomposition of W (in order to make later calculations more efficient)
 #'
-#' @return \item{tBasis}{The (weighted) SVD basis of the centred ensemble if RemoveMean = TRUE, of the original data otherwise}
+#' @returns \item{tBasis}{The (weighted) SVD basis of the centred ensemble if RemoveMean = TRUE, of the original data otherwise}
 #' \item{CentredField}{The centred data if RemoveMean = TRUE, the original data otherwise.}
 #' \item{EnsembleMean}{The mean across the columns of the data. A zero vector if RemoveMean = FALSE}
 #' \item{}
@@ -98,7 +98,7 @@ MakeDataBasis <- function(data, weightinv = NULL, W = NULL, RemoveMean = TRUE, C
 #' @param Noise Whether to include a noise vector (sometimes used in selection of the GP mean function)
 #' @param weightinv matrix to use for projection. By default, looks for this in DataBasis, can be overwritten in the function arguments if desire a different weighted projection
 #' 
-#' @return Inputs and outputs required for emulation
+#' @returns Inputs and outputs required for emulation
 #' 
 GetEmData <- function(Design, DataBasis, q = NULL, Noise = FALSE, weightinv = NULL, input_range = c(-1,1)){
   if (q > ncol(DataBasis$tBasis)){
@@ -140,7 +140,7 @@ GetEmData <- function(Design, DataBasis, q = NULL, Noise = FALSE, weightinv = NU
 #' @param Q l x l matrix from eigen decomposition of W^{-1}, if already have this then speeds up calculation of basis
 #' @param Lambda vector from eigen decomposition of W^{-1}, if already have this then speeds up calculation of basis
 #'
-#' @return The weighted SVD of the data.
+#' @returns The weighted SVD of the data.
 #'
 wsvd <- function(data, weightinv = NULL, Q = NULL, Lambda = NULL){
   if (is.null(weightinv)){
@@ -182,7 +182,7 @@ wsvd <- function(data, weightinv = NULL, Q = NULL, Lambda = NULL){
 #'
 #' @param W square positive definite variance matrix
 #'
-#' @return Inverse of W, with attributes 'identity' and 'diagonal', used by other functions in the package to make calculations more efficient.
+#' @returns Inverse of W, with attributes 'identity' and 'diagonal', used by other functions in the package to make calculations more efficient.
 #'
 #' @examples Winv <- GetInverse(diag(100))
 #' attributes(Winv) # diagonal = TRUE, identity = TRUE
@@ -224,7 +224,7 @@ GetInverse <- function(W){
 #' @param basis Basis matrix
 #' @param weightinv If NULL, uses standard SVD projection. Otherwise, uses weighted projection.
 #'
-#' @return Matrix of basis coefficients
+#' @returns Matrix of basis coefficients
 #'
 #' @examples # First generate some data
 #'
@@ -303,7 +303,8 @@ Project <- function(data, basis, weightinv = NULL){
 #'
 #' @param coeffs Coefficient vector
 #' @param basis Basis matrix
-#' @return Reconstructed field.
+#' 
+#' @returns Reconstructed field.
 #'
 #' @export
 Recon <- function(coeffs, basis){
@@ -375,7 +376,7 @@ Recon <- function(coeffs, basis){
 #' @param field Vector over original field
 #' @param basis Basis matrix
 #'
-#' @return Reconstruction of the original field.
+#' @returns Reconstruction of the original field.
 #'
 #' @examples
 #'
@@ -398,7 +399,7 @@ ReconField <- function(field, basis, ...){
 #' @param basis The basis to project with
 #' @param weightinv The inverse of positive definite matrix W. If NULL, uses the standard projection, otherwise projects in the norm given by W.
 #'
-#' @return The projection of the original matrix on the basis.
+#' @returns The projection of the original matrix on the basis.
 #'
 #' @export
 ProjectVar <- function(mat, basis, weightinv = NULL){
@@ -428,7 +429,7 @@ ProjectVar <- function(mat, basis, weightinv = NULL){
 #' @param weightinv Inverse of weight matrix W. If NULL (default), calculates the mean squared error
 #' @param scale If TRUE, scales by the dimension (so analogous to mean squared error)
 #'
-#' @return The reconstruction error
+#' @returns The reconstruction error
 #'
 #' @export
 ReconError <- function(obs, basis, weightinv = NULL, scale = FALSE){
@@ -469,7 +470,7 @@ ReconError <- function(obs, basis, weightinv = NULL, scale = FALSE){
 #' @param obs (Centred) observation vector
 #' @param basis The basis to project onto
 #' 
-#' @return Vector of reconstruction errors for the observations
+#' @returns Vector of reconstruction errors for the observations
 #' 
 #' @export
 errors <- function(basis, obs, weightinv=NULL){
@@ -498,7 +499,7 @@ errors <- function(basis, obs, weightinv=NULL){
 #' @param psi t(original_basis) %*% weightinv %*% original_basis, where the new basis is a linear combination of some original basis
 #' @param basis_lincom Vector of linear combinations (if new basis is a linear combination of some original basis)
 #'
-#' @return The proportion of variability in the data that is explained by the basis
+#' @returns The proportion of variability in the data that is explained by the basis
 #'
 #' @export
 VarExplained <- function(basis, data, weightinv = NULL, total_sum = NULL, psi = NULL, basis_lincom = NULL){
@@ -558,7 +559,7 @@ VarExplained <- function(basis, data, weightinv = NULL, total_sum = NULL, psi = 
 #' @param vtot The total proportion of variability in the data to be explained by the truncated basis
 #' @param weightinv The inverse of W
 #'
-#' @return The number of basis vectors required to explain vtot of the data.
+#' @returns The number of basis vectors required to explain vtot of the data.
 #'
 #' @export
 ExplainT <- function(DataBasis, vtot = 0.95, weightinv = NULL){
@@ -587,7 +588,7 @@ ExplainT <- function(DataBasis, vtot = 0.95, weightinv = NULL){
 #' @param BasisUncertainty 
 #' @param ... 
 #' 
-#' @return 
+#' @returns description
 #' 
 #' @export
 BasisEmSamples <- function(BasisPred, DataBasis, ns = 100, AddMean = TRUE, ReturnAll = TRUE, BasisUncertainty = TRUE, ...){
