@@ -281,13 +281,20 @@ UnscaleInputs <- function(scaled_design, InputRanges, range = c(0,1)){
 
 
 
-#' Split into training and validation data randomly
+#' Train/test sets
+#' 
+#' Splits a dataset into training and validation data randomly using a given training proportion.
 #'
-#' @param data 
-#' @param train 
-#' @param seed 
+#' @param data Dataset to split into training and test sets.
+#' @param train Proportion to assign to the training set. Defaults to 0.75.
+#' @param seed Numeric seed that can be provided for reproducibility. Defaults to `NULL`.
 #' 
+#' @returns \item{train_data}{Training dataset.}
+#' \item{train_inds}{Which rows of `data` were assigned to the training dataset.}
+#' \item{val_data}{Test/validation dataset.}
+#' \item{val_inds}{Which rows of `data` were assigned to the test/validation dataset.}
 #' 
+#' @export
 TrainTestSplit <- function(data, train = 0.75, seed = NULL){
   n <- nrow(data)
   n_train <- ceiling(train * n)
@@ -383,7 +390,7 @@ BuildHet <- function(Response, tData, input = NULL, covariance = 'Matern5_2', ..
 
 
 
-#' Building a single GaSP emulator for basis output
+#' Building a single GaSP emulator
 #' 
 #' Given tData object, fit an emulator for the selected coefficient
 #' 
@@ -479,7 +486,9 @@ BuildGasp <- function(Response, tData, input = NULL, mean_fn = NULL, linModel = 
 
 
 
-#' Title
+#' Building a single GP emulator using dgpsi
+#' 
+#' 
 #'
 #' @param Response 
 #' @param tData 
@@ -529,7 +538,9 @@ BuildGP <- function(Response, tData, input = NULL, covariance = 'matern5_2', nug
 }
 
 
-#' Title
+#' Building a single DGP emulator using dgpsi
+#' 
+#' 
 #'
 #' @param Response 
 #' @param tData 
@@ -632,7 +643,6 @@ Predict <- function(emulator, design){
 #' @param design 
 #'
 #' @returns
-#' @export
 #'
 #' @examples
 PredictSingle <- function(emulator, design){
@@ -786,14 +796,16 @@ PredictGasp <- function(emulator, design){
 
 
 
-#' Title
+#' Emulator validation
+#' 
+#' Predicting and plotting out-of-sample predictions vs the true output.
 #'
-#' @param emulator 
-#' @param valData 
-#' @param interval 
+#' @param emulator A single emulator, or a list of emulators.
+#' @param valData Data frame of input vectors and true simulator output corresponding to each output in `emulator`. Set of input vectors used to evaluate the emulators, and plot the emulator predictions vs the truth.
+#' @param interval Prediction interval to plot as error bars. Defaults to 0.95, can be in (0,1).
 #' @param by_input 
-#' @param by_index 
-#' @param Obs 
+#' @param by_index Whether the x axis should be the emulator prediction (`FALSE`, the default) or the training point index.
+#' @param Obs If provided, adds horizontal and/or vertical dashed lines to show the location of the observation(s) relative to the emulator predictions. Defaults to `NULL`.
 #'
 #' @returns
 #' @export
@@ -847,7 +859,6 @@ Validate <- function(emulator, valData, interval = 0.95, by_input = FALSE, by_in
 #'
 #' @returns an object containing the mean, variance (with nugget removed), and nugget variance, at each input location
 #'
-#' @export
 ValidateSingle <- function(emulator, valData, interval = 0.95, by_input = FALSE, by_index = FALSE, Obs = NULL){
   
   if (interval <= 0 | interval >= 1){
@@ -869,29 +880,32 @@ ValidateSingle <- function(emulator, valData, interval = 0.95, by_input = FALSE,
   
   if (emulator$method == 'rgasp'){
     preds <- PredictGasp(emulator, design)
+    preds$lower95 <- preds$upper95 <- NULL
+    preds$lower <- preds$mean + stats::qnorm(interval[1])*preds$sd
+    preds$upper <- preds$mean + stats::qnorm(interval[2])*preds$sd
     preds$sd <- NULL
   }
   
   if (emulator$method %in% c('gp', 'dgp')){
     preds <- PredictDGP(emulator, design)
-    preds$lower95 <- preds$mean + stats::qnorm(interval[1])*sqrt(preds$var)
-    preds$upper95 <- preds$mean + stats::qnorm(interval[2])*sqrt(preds$var)
+    preds$lower <- preds$mean + stats::qnorm(interval[1])*sqrt(preds$var)
+    preds$upper <- preds$mean + stats::qnorm(interval[2])*sqrt(preds$var)
     preds$var <- preds$M <- NULL
   }
   
   if (emulator$method == 'het'){
     preds <- PredictHet(emulator, design)
     vars <- preds$sd2 + preds$nugs
-    preds$lower95 <- preds$mean + stats::qnorm(interval[1])*sqrt(vars)
-    preds$upper95 <- preds$mean + stats::qnorm(interval[2])*sqrt(vars)
+    preds$lower <- preds$mean + stats::qnorm(interval[1])*sqrt(vars)
+    preds$upper <- preds$mean + stats::qnorm(interval[2])*sqrt(vars)
     preds$sd2var <- preds$cov <- preds$sd2 <- preds$nugs <- NULL
   }
   
-  upp <- max(c(preds$upper95, response))
-  low <- min(c(preds$lower95, response))
+  upp <- max(c(preds$upper, response))
+  low <- min(c(preds$lower, response))
   preds$truth <- response
 
-  preds$In95 <- preds$truth >= preds$lower95 & preds$truth <= preds$upper95
+  preds$In95 <- preds$truth >= preds$lower & preds$truth <= preds$upper
   perc_outside <- round(sum(preds$In95 == FALSE) / length(preds$In95) * 100, 1)
   
   cols <- cols_validate
@@ -903,7 +917,7 @@ ValidateSingle <- function(emulator, valData, interval = 0.95, by_input = FALSE,
   if (by_index){
     preds$ind <- 1:length(preds$mean)
     plot1 <- ggplot(as.data.frame(preds), aes(x = .data$ind, y = .data$mean)) +
-      geom_errorbar(aes(ymin = .data$lower95, ymax = .data$upper95), col = cols[1]) +
+      geom_errorbar(aes(ymin = .data$lower, ymax = .data$upper), col = cols[1]) +
       geom_point(col = cols[1]) +
       geom_point(aes(x = .data$ind, y = .data$truth, col = .data$In95)) +
       scale_colour_manual(values = c(cols[2:3])) +
@@ -918,7 +932,7 @@ ValidateSingle <- function(emulator, valData, interval = 0.95, by_input = FALSE,
   
   else {
     plot1 <- ggplot(as.data.frame(preds), aes(x = .data$truth, y = .data$mean, col = .data$In95)) +
-      geom_errorbar(aes(ymin = .data$lower95, ymax = .data$upper95), col = cols[1]) +
+      geom_errorbar(aes(ymin = .data$lower, ymax = .data$upper), col = cols[1]) +
       geom_point() +
       scale_colour_manual(values = c(cols[2:3])) +
       geom_abline(slope = 1, alpha = 0.6) +
@@ -936,9 +950,9 @@ ValidateSingle <- function(emulator, valData, interval = 0.95, by_input = FALSE,
   if (by_input == TRUE){
     plot_data <- data.frame(design, as.data.frame(preds))
     plot_data$ind <- NULL
-    plot_data <- reshape2::melt(plot_data, id.vars = c('mean', 'lower95', 'upper95', 'truth', 'In95'))
+    plot_data <- reshape2::melt(plot_data, id.vars = c('mean', 'lower', 'upper', 'truth', 'In95'))
     plot2 <- ggplot(plot_data, aes(x = .data$value, y = .data$mean)) +
-      geom_errorbar(aes(ymin = .data$lower95, ymax = .data$upper95), col = cols[1]) +
+      geom_errorbar(aes(ymin = .data$lower, ymax = .data$upper), col = cols[1]) +
       geom_point(col = cols[1]) +
       geom_point(aes(x = .data$value, y = .data$truth, col = .data$In95)) +
       facet_wrap(vars(.data$variable), scales = 'free_x') +
@@ -968,18 +982,20 @@ ValidateSingle <- function(emulator, valData, interval = 0.95, by_input = FALSE,
 
 
 
-#' Title
+#' Emulator leave-one-out predictions
+#' 
+#' Plotting emulator leave-one-out predictions vs the true output.
 #'
-#' @param emulator 
-#' @param interval 
-#' @param Obs 
-#' @param ... 
+#' @param emulator A single emulator, or a list of emulators.
+#' @param interval Prediction interval to plot as error bars. Defaults to 0.95, can be in (0,1).
+#' @param Obs If provided, adds horizontal and/or vertical dashed lines to show the location of the observation(s) relative to the emulator predictions. Defaults to `NULL`.
+#' @param by_index Whether the x axis should be the emulator prediction (`FALSE`, the default) or the training point index.
 #'
-#' @returns
+#' @returns Leave-one-out plots for each emulator.
 #' @export
 #'
 #' @examples
-LeaveOneOut <- function(emulator, interval = 0.95, Obs = NULL, ...){
+LeaveOneOut <- function(emulator, interval = 0.95, Obs = NULL, by_index = FALSE){
   
   # Find number of emulators
   if (!(is.null(emulator$method))){
@@ -991,12 +1007,12 @@ LeaveOneOut <- function(emulator, interval = 0.95, Obs = NULL, ...){
   }
   
   if (n_em == 1){
-    plot <- LeaveOneOutSingle(emulator, Obs = Obs, ...)
+    plot <- LeaveOneOutSingle(emulator, Obs = Obs, by_index = by_index)
   }
   
   else {
     plot <- parallel::mclapply(1:n_em, 
-                               function(k) LeaveOneOutSingle(emulator[[k]], Obs = Obs[k], interval = interval, ...),
+                               function(k) LeaveOneOutSingle(emulator[[k]], Obs = Obs[k], interval = interval, by_index = by_index),
                                mc.cores = n_cores)
   }
   
@@ -1018,7 +1034,6 @@ LeaveOneOut <- function(emulator, interval = 0.95, Obs = NULL, ...){
 #' 
 #' @returns description
 #' 
-#' @export
 LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs = NULL){
 
   if (interval <= 0 | interval >= 1){
@@ -1031,27 +1046,27 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs =
   
   if (emulator$method == 'rgasp'){
     loo_preds <- RobustGaSP::leave_one_out_rgasp(emulator$em)
-    loo_preds$lower95 <- loo_preds$mean + stats::qnorm(interval[1])*loo_preds$sd
-    loo_preds$upper95 <- loo_preds$mean + stats::qnorm(interval[2])*loo_preds$sd
+    loo_preds$lower <- loo_preds$mean + stats::qnorm(interval[1])*loo_preds$sd
+    loo_preds$upper <- loo_preds$mean + stats::qnorm(interval[2])*loo_preds$sd
   }
   
   if (emulator$method %in% c('gp', 'dgp')){
     loo_preds <- dgpsi::validate(emulator$em, verb = FALSE)$loo
-    loo_preds$lower95 <- loo_preds$lower
-    loo_preds$upper95 <- loo_preds$upper
+    loo_preds$lower <- loo_preds$lower
+    loo_preds$upper <- loo_preds$upper
   }
   
   if (emulator$method == 'het'){
     loo_preds <- hetGP::LOO_preds(emulator$em)
-    loo_preds$lower95 <- loo_preds$mean + stats::qnorm(interval[1])*sqrt(loo_preds$sd2)
-    loo_preds$upper95 <- loo_preds$mean + stats::qnorm(interval[2])*sqrt(loo_preds$sd2)
+    loo_preds$lower <- loo_preds$mean + stats::qnorm(interval[1])*sqrt(loo_preds$sd2)
+    loo_preds$upper <- loo_preds$mean + stats::qnorm(interval[2])*sqrt(loo_preds$sd2)
   }
 
   loo_preds$truth <- response
-  upp <- max(c(loo_preds$upper95, response))
-  low <- min(c(loo_preds$lower95, response))
+  upp <- max(c(loo_preds$upper, response))
+  low <- min(c(loo_preds$lower, response))
   
-  loo_preds$In95 <- loo_preds$truth >= loo_preds$lower95 & loo_preds$truth <= loo_preds$upper95
+  loo_preds$In95 <- loo_preds$truth >= loo_preds$lower & loo_preds$truth <= loo_preds$upper
   perc_outside <- round(sum(loo_preds$In95 == FALSE) / length(loo_preds$In95) * 100, 1)
   
   cols <- cols_validate
@@ -1063,7 +1078,7 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs =
   if (by_index){
     loo_preds$ind <- 1:length(loo_preds$mean)
     plot <- ggplot(as.data.frame(loo_preds), aes(x = .data$ind, y = .data$mean)) +
-      geom_errorbar(aes(ymin = .data$lower95, ymax = .data$upper95), col = cols[1]) +
+      geom_errorbar(aes(ymin = .data$lower, ymax = .data$upper), col = cols[1]) +
       geom_point(col = cols[1]) +
       geom_point(aes(x = .data$ind, y = .data$truth, col = .data$In95)) +
       scale_colour_manual(values = c(cols[2:3])) +
@@ -1078,7 +1093,7 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs =
   
   else {
     plot <- ggplot(as.data.frame(loo_preds), aes(x = .data$truth, y = .data$mean, col = .data$In95)) +
-      geom_errorbar(aes(ymin = .data$lower95, ymax = .data$upper95), col = cols[1]) +
+      geom_errorbar(aes(ymin = .data$lower, ymax = .data$upper), col = cols[1]) +
       geom_point() +
       scale_colour_manual(values = c(cols[2:3])) +
       geom_abline(slope = 1, alpha = 0.6) +
