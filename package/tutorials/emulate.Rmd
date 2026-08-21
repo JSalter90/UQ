@@ -14,6 +14,8 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, cache = TRU
 
 Disclaimer (5/8/26): this is still WIP, and some functionality may slightly change.
 
+This example demonstrates some of the emulation functionality using a set of simulations from a pulmonary circulation model. Other aspects of this dataset are shown in `full_workflow.html`.
+
 Load in design, data:
 
 ```{r, echo = TRUE}
@@ -29,7 +31,7 @@ library(ggplot2)
 ```
 
 
-Scaling the design to [0,1]:
+Scaling the design to [0,1] using the provided parameter ranges:
 
 ```{r}
 scaled_design <- ScaleInputs(design[,1:4], parRanges, c(0,1))
@@ -41,7 +43,10 @@ We'll create 2 objects to demonstrate emulation. Firstly, calculate the SVD and 
 flow1_basis <- MakeDataBasis(flow1_data)
 flow1_basis$grid <- data.frame(Time = seq(from=0,by = 0.01, len = 512))
 flow1_coeffs <- GetEmData(scaled_design, flow1_basis, q = 5)
+head(flow1_coeffs)
 ```
+
+The dataset we've created here contains the 4 inputs, followed by the 5 leading basis coefficients, for each of the 100 simulations in turn.
 
 And alternatively, select a subset of timepoints:
 
@@ -52,7 +57,10 @@ flow1_time <- data.frame(scaled_design,
                          t150 = flow1_data[time_inds[2],],
                          t300 = flow1_data[time_inds[3],],
                          t500 = flow1_data[time_inds[4],])
+head(flow1_time)
 ```
+
+Similarly, each row here is a different simulation, containing the 4 inputs, and the 4 quantities (timepoints) we've decided to emulate.
 
 Splitting into train/validation for later:
 
@@ -68,7 +76,7 @@ val_inds <- tt$val_inds
 
 `FitEmulators` is the main function for training emulators.
 
-If we just apply it to our data above, providing as little as possible:
+If we just apply it to our data above, providing no other information and hence using the default settings:
 
 ```{r, results='hide'}
 em_time <- FitEmulators(flow1_time[train_inds,])
@@ -89,15 +97,15 @@ unlist(lapply(1:5, function(k) em_coeffs[[k]]$response))
 
 This highlights a key difference in the default behaviour:
 
-  * If the provided data includes a column named `C1`, `FitEmulators` will automatically set all preceding columns as the emulator inputs, and will train emulators for `C1` **and all subsequent columns**. Here, `flow1_coeffs` containa the leading 5 coefficients, hence 5 emulators have been trained.
+  * If the provided data includes a column named `C1`, `FitEmulators` will automatically set all preceding columns as the emulator inputs, and will train emulators for `C1` **and all subsequent columns**. Here, `flow1_coeffs` contains the leading 5 coefficients, hence 5 emulators have been trained.
   
-  * There's no column named `C1` in `flow1_time`. Given no other information, `FitEmulators` assumes the final column is the target output, and all preceding columns are inputs. Therefore, `t50`, `t150` and `t300` have been included as predictors (along with the 4 actual inputs) for emulating `t500`:
+  * There's no column named `C1` in `flow1_time`. Given no other information, `FitEmulators` assumes the final column is the target output, and all preceding columns are inputs. Therefore, in the emulator `em_time` fitted above, `t50`, `t150` and `t300` have been included as predictors (along with the 4 actual inputs) for emulating `t500`:
   
 ```{r}
 em_time$em
 ```
 
-To instead get what we obviously intend here (emulate each of the 4 time points using the 4 input columns), we need to add some extra information. First, we can point towards which columns are inputs:
+To instead get what we obviously intend here (emulate each of the 4 time points using the 4 input columns), we need to provide some extra information. First, we can point towards which columns are inputs:
 
 ```{r, results='hide'}
 em_time <- FitEmulators(flow1_time[train_inds,], input = 1:4)
@@ -108,7 +116,9 @@ summary(em_time)
 em_time$response
 ```
 
-This still fits a single emulator for `t500`, but now only uses the first 4 columns as inputs. To emulate all 4 outputs:
+This still fits a single emulator (for `t500` only), but now only uses the first 4 columns as inputs. 
+
+To finally emulate all 4 outputs:
 
 ```{r, results='hide'}
 em_time <- FitEmulators(flow1_time[train_inds,], input = 1:4, output = c('t50', 't150', 't300', 't500'))
@@ -119,7 +129,7 @@ summary(em_time)
 unlist(lapply(1:4, function(k) em_time[[k]]$response))
 ```
 
-(Alternatively, can select the outputs with column indices:)
+Alternatively, can select the outputs with column indices:
 
 ```{r, results='hide'}
 em_time <- FitEmulators(flow1_time[train_inds,], input = 1:4, output_cols = 5:8)
@@ -179,9 +189,9 @@ val_time[[1]]$input
 
 ## Refitting a specific emulator
 
-By default, the same assumptions are used (currently) for each emulator. These might not be suitable across all outputs. Above, the out-of-sample predictions for `t150` aren't ideal (outside 95\% prediction intervals for 6 of the 25 points), so we may want to refit this with a different method.
+By default, the same assumptions are used (currently) for each emulator fitted by a single call of `FitEmulator`. The same assumptions may not be be suitable across all outputs. Above, the out-of-sample predictions for `t150` aren't ideal (outside 95\% prediction intervals for 6 of the 25 points), so we may want to refit this with a different method.
 
-We can replace the existing emulator with a version refitted with different assumptions via:
+We can replace the existing emulator for `t150` with a version refitted with different assumptions via:
 
 ```{r}
 em_time <- RefitEmulator(em_time, 't150', method = 'het')
@@ -193,13 +203,15 @@ Instead of rgasp, we're tried fitting using hetGP instead. Reproducing the valid
 val_time <- Validate(em_time, flow1_time[val_inds,], by_index = TRUE)
 ```
 
-At least when considering the 25 validation points, this has improved predictions.
+At least when considering the 25 validation points, this has improved predictions slightly.
 
 
 
 ## Fitting different emulator types
 
 We could directly compare different methods for emulating the same output. We could use `FitEmulators` as follows to fit for 4 different methods:
+
+(Not run: `dgpsi`, used by `method = gp` and `method = dgp`, doesn't work currently in RMd. Running the below code in `R` as normal will work.)
 
 ```{r}
 # emC1_v1 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 1:4, output = 'C1')
@@ -219,7 +231,7 @@ And can then combine these into a single list to enable us to use the plotting f
 
 ## Different input sets
 
-We could instead use different sets of inputs (more useful if emulating different outputs where different active sets of inputs, but as an illustration just done for `C1`):
+We could instead use different sets of inputs (more useful if emulating different outputs where there are different active sets of inputs, but as an illustration just done for `C1`):
 
 ```{r, results='hide'}
 emC1_v1 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 4, output = 'C1')
@@ -234,8 +246,12 @@ emC1 <- list(emC1_v1, emC1_v2, emC1_v3, emC1_v4)
 val_C1 <- Validate(emC1, flow1_coeffs[val_inds,], by_index = TRUE)
 ```
 
+Training an emulator using only the 4th input is not particularly useful, and using the 3rd and 4th only doesn't do much better.
+
 
 ## Different covariance functions
+
+A few covariance functions are currently possible (Matern 3/2, Matern 5/2, squared exponential). The default is currently Matern 5/2. Each underlying package names the covariance functions differently (below, written as `rgasp` accepts them), however `FitEmulators` accepts a range of naming conventions and converts them appropriately (see source code / help file for exhaustive list):
 
 ```{r, results='hide'}
 emC1_v1 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 1:4, covariance = 'matern5_2', output = 'C1')
@@ -250,7 +266,7 @@ val_C1 <- Validate(emC1, flow1_coeffs[val_inds,], by_index = TRUE)
 
 ## With/without nugget
 
-Could also compare fitting the emulator with and without a nugget term:
+Could also compare fitting the emulator with and without a nugget term. The default is to include one:
 
 ```{r, results='hide'}
 emC1_v1 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 1:4, output = 'C1', nugget = TRUE)
