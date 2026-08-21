@@ -219,11 +219,35 @@ ImplField <- function(Predictions, DataBasis, Obs, ObsVar, DiscVar = 0, obs_inds
     DiscVar <- DiscVar*diag(length(obs_inds))
   }
   
-  if (!(length(obs_inds) == nrow(ObsVar))){
+  # If provided a vector of variances, assumes uncorrelated
+  if (length(ObsVar) == length(obs_inds)){
+    ObsVar <- diag(ObsVar)
+  }
+  
+  if (length(DiscVar) == length(obs_inds)){
+    DiscVar <- diag(DiscVar)
+  }
+  
+  # Check whether a vector with incorrect length has been provided
+  if (is.null(nrow(ObsVar))){
+    if (!(length(ObsVar) == length(obs_inds))){
+      stop('Observations and observation error matrix have inconsistent dimensions')
+    }
+  }
+  
+  # If matrix provided, check has correct dimension
+  else if (!(nrow(ObsVar) == length(obs_inds)) | !(ncol(ObsVar) == length(obs_inds))){
     stop('Observations and observation error matrix have inconsistent dimensions')
   }
   
-  if (!(length(obs_inds) == nrow(DiscVar))){
+  if (is.null(nrow(DiscVar))){
+    if (!(length(DiscVar) == length(obs_inds))){
+      stop('Observations and discrepancy variance matrix have inconsistent dimensions')
+    }
+  }
+  
+  # If matrix provided, check has correct dimension
+  else if (!(nrow(DiscVar) == length(obs_inds)) | !(ncol(DiscVar) == length(obs_inds))){
     stop('Observations and discrepancy variance matrix have inconsistent dimensions')
   }
 
