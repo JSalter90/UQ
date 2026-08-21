@@ -111,12 +111,15 @@ val_inds <- tt$val_inds
 
 More details are provided in `emulate.html`, but briefly, we can fit a single emulator by providing a single named output, and pointing to which columns we want to be treated as inputs:
 
-```{r}
+```{r, results='hide'}
 em_t150 <- FitEmulators(flow1_time[train_inds,], input = 1:4, output = 't150')
+```
+
+```{r}
 summary(em_t150)
 ```
 
-This has stored an rgasp emulator under `$em`, what mean function was used (here none, hence `NULL`), and also what the training data was (including only the selected inputs and output, rather than the full given `tData`).
+This has stored an `rgasp` emulator under `$em`, what mean function was used (here none, hence `NULL`), and also what the training data was (including only the selected inputs and output, rather than the full given `tData`).
 
 To look at the emulator predictions, we could plot leave one outs:
 
@@ -145,13 +148,10 @@ The same code can be used to emulate all 4 of the chosen outputs independently:
 em_time <- FitEmulators(flow1_time[train_inds,], input = 1:4, output = c('t50', 't150', 't300', 't500'))
 ```
 
+Now the fitted `em_time` is a list of 4 individual emulators:
+
 ```{r}
 summary(em_time)
-```
-
-Now the fitted `em_time` is a list of 4 individual emulators.
-
-```{r}
 summary(em_time[[1]])
 ```
 
@@ -169,7 +169,7 @@ val_time <- Validate(em_time, flow1_time[val_inds,], by_index = TRUE)
 
 ## Predictions
 
-Predictions work the same for each type of emulator:
+Predictions work the same for each type of emulator. Providing a set of 5000 points sampled from input space:
 
 ```{r}
 set.seed(58219)
@@ -200,62 +200,86 @@ obs <- flow1_data[,100]
 truth <- scaled_design[100,]
 ```
 
-We can calculate the implausibility for an individual output, given a set of predictions:
+We can calculate the implausibility for an individual output, given a set of predictions, and given observation error variance (here, set at 0.5) and discrepancy variance (defaults to zero, as could provide combined with the observation error):
 
 ```{r}
-impl_t150 <- Impl(preds_t150, Obs = obs[150], ObsVar = 0.5, kmax = 1)
-summary(impl_t150)
-summary(impl_t150$Impl)
-impl_t150$NROY
-impl_t150$Pass_kth
-impl_t150$Pass_N
+impl_t150 <- Impl(preds_t150, Obs = obs[150], ObsVar = 0.5, DiscVar = 0, kmax = 1)
 ```
 
-Or for multiple outputs (independently). If `obs_var` is only given as a single value, the same variance is assumed for each output, but could instead be given as a vector of length 4:
+Or for multiple outputs (independently):
 
 ```{r}
-impl_time <- Impl(preds_time, Obs = obs[c(50,150,300,500)], ObsVar = 0.5, kmax = 1)
-summary(impl_time)
-summary(impl_time$Impl)
-impl_time$NROY
-impl_time$Pass_kth
-impl_time$Pass_N
+impl_time <- Impl(preds_time, Obs = obs[c(50,150,300,500)], ObsVar = 0.5, DiscVar = 0, kmax = 1)
 ```
 
-Note that the 2nd column in the latter is the same as the implausibility from `impl_t150`.
+Where we have now provided 4 sets of predictions and 4 observations. `ObsVar` (and `DiscVar`) has still been set as a single value, which is interpreted as each observation has the same observational error. Instead, this could be provided as a vector of length 4:
 
-It will usually be more convenient to combine prediction and calibration:
+```{r}
+#impl_time <- Impl(preds_time, Obs = obs[c(50,150,300,500)], ObsVar = c(0.5, 0.1, 1, 0.5), DiscVar = c(0, 1, 0.2, 0), kmax = 1)
+```
+
+Although prediction and calculating implausibility can be done by hand as above, usually it will be more convenient to combine them:
 
 ```{r}
 hm_time <- HistoryMatch(em_time, BigDesign, Obs = obs[c(50,150,300,500)], ObsVar = 0.5, kmax = 1)
 summary(hm_time)
 ```
 
-This returns both the predictions (identical to what we constructed by hand):
+There's several outputs returned by this function:
+
+  * `$Design` is the same as the given design, but with a column appended indicating whether each point is in NROY space or not.
+  
+  * `$Preds` contains the emulator predictions at the given design.
+  
+  * `$Impl`, `$NROY`, `$Pass_kth`, `$Pass_N`, `$inNROY` and `$wave` are related to the calibration part. The implausibility itself, for each provided input vector and each observation:
+
+```{r}
+head(hm_time$Impl)
+```
+
+The proportion of space not ruled out:
+
+```{r}
+hm_time$NROY
+```
+
+The proportion of space that satisfies the kth constraint:
+
+```{r}
+hm_time$Pass_kth
+```
+
+The proportion of space that passes 0, 1, 2, 3, 4 out of 4 constraints:
+
+```{r}
+hm_time$Pass_N
+```
+
+Whether each row of the design is in NROY:
+
+```{r}
+head(hm_time$inNROY)
+```
+
+As a demonstration that what's happening within the `HistoryMatch` function is identical to what we did previously, the predictions are the same:
 
 ```{r}
 summary(hm_time$Preds$Expectation - preds_time$Expectation)
 ```
 
-and the implausibility:
+As is the implausibility:
 
 ```{r}
 summary(hm_time$Impl - impl_time$Impl)
 ```
 
-`hm$Design` contains a column classifying each point as NROY or not:
-
-```{r}
-head(hm_time$Design)
-```
-
-Taking the output, can visualise the NROY space in 1D and 2D, with the truth overlaid:
+Taking the output, we can visualise the NROY space in 1D and 2D, with the truth overlaid:
 
 ```{r, fig.height = 5}
 PlotNROY(hm_time$Design, k = 1:4, Truth = truth)
 ```
 
-For more on HM, and functionality for performing multiple waves smoothly, see XXXX.
+A multiwave example, using both scalar outputs and higher dimensional, correlated outputs, is found in `systemic.html`.
 
 
 
