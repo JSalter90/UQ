@@ -721,32 +721,46 @@ AddPreviousNROY <- function(DesignHM, NewDesign, NewData, DataBasis, Obs, ...){
 
 
 
-#' Pairs plot of NROY space
+#' Plotting NROY space
+#' 
+#' Pairs plots and 1D densities of NROY space
 #'
 #' @param Design Data frame of inputs, possibly with a TRUE/FALSE final column named `NROY`.
 #' @param k Indices relating to which columns of `Design` to plot. If NULL, plots all.
-#' @param NROY Vector of TRUE/FALSE labels, corresponding to classification of `Design`. If NULL, uses the final column of `Design`.
-#' @param Truth 
-#' @param size Controlling size of points on lower half of plot
+#' @param NROY Vector of TRUE/FALSE labels, corresponding to rows of `Design`. If NULL, uses the final column of `Design`.
+#' @param Impl Vector of implausibility values, corresponding to rows of `Design`. If provided, the lower pairs plots are coloured by implausibility instead of by whether points are in NROY. Defaults to `NULL`.
+#' @param Truth A point in input space to be added to the pairs plots, perhaps representing a known true input value, or a default setting. Defaults to NULL, in which case no point is added.
 #'
-#' @returns
+#' @returns Pairs plot.
 #' @export
 #'
 #' @examples
-PlotNROY <- function(Design, k = NULL, NROY = NULL, Truth = NULL){
+PlotNROY <- function(Design, k = NULL, NROY = NULL, Impl = NULL, Truth = NULL){
   # If a vector of NROY labels is not provided, assume this is the final column of Design
   if (is.null(NROY)){
     colnames(Design)[ncol(Design)] <- 'NROY'
   }
   
   else {
+    if (!(length(NROY) == nrow(Design))){
+      stop('Length of provided NROY labels is different from number of rows in Design')
+    }
     Design <- data.frame(Design, NROY = NROY)
   }
   
+  # If columns to be plotted aren't provided, use all prior to the final column
   if (is.null(k)){
     k <- 1:(ncol(Design)-1)
   }
   
+  # If Impl is provided, colour points with this instead
+  if (!(is.null(Impl))){
+    if (!(length(Impl) == nrow(Design))){
+      stop('Length of provided implausibilities is different from number of rows in Design')
+    }
+    Design$NROY <- Impl
+  }
+
   size <- ifelse(nrow(Design) < 1000, 2, 0.5)
   
   # If only 2 inputs provided, single pairs plot
@@ -756,10 +770,16 @@ PlotNROY <- function(Design, k = NULL, NROY = NULL, Truth = NULL){
     
     plot <- ggplot(Design, aes(.data$input1, .data$input2, col = .data$NROY)) + 
       geom_point(size = size) +
-      scale_color_manual(values = cols_validate[-1]) +
       labs(x = colnames(Design)[k[1]], y = colnames(Design)[k[2]]) +
       theme_bw()
     
+    if (is.null(Impl)){
+      plot <- plot + scale_color_manual(values = cols_validate[-1])
+    }
+    else {
+      plot <- plot + viridis::scale_color_viridis()
+    }
+
     if (!is.null(Truth)){
       Truth <- as.data.frame(Truth)
       Truth$input1 <- Truth[,k[1]]
@@ -769,26 +789,43 @@ PlotNROY <- function(Design, k = NULL, NROY = NULL, Truth = NULL){
   }
   
   else {
-    plot <- GGally::ggpairs(Design, columns = k, aes(col = .data$NROY), 
-                            upper = list(continuous = GGally::wrap("density", alpha = 0.5), combo = "box_no_facet"),
-                            lower = list(continuous = GGally::wrap("points", alpha = 0.3, size = size), combo = GGally::wrap("dot_no_facet", alpha = 0.4)),
-                            diag = list(continuous = GGally::wrap("densityDiag", alpha = 0.3)), 
-                            legend = 1) +
-      theme_bw() +
-      theme(legend.position = "bottom") + 
-      scale_colour_manual(values = cols_validate[-1]) +
-      scale_fill_manual(values = cols_validate[-1])
-    
+    if (is.null(Impl)){
+      plot <- GGally::ggpairs(Design, columns = k, aes(col = .data$NROY), 
+                              upper = list(continuous = GGally::wrap("density", alpha = 0.5), combo = "box_no_facet"),
+                              lower = list(continuous = GGally::wrap("points", alpha = 0.3, size = size), combo = GGally::wrap("dot_no_facet", alpha = 0.4)),
+                              diag = list(continuous = GGally::wrap("densityDiag", alpha = 0.3)), 
+                              legend = c(1,1)) +
+        theme_bw() +
+        theme(legend.position = "bottom") + 
+        scale_fill_manual(values = cols_validate[-1]) + 
+        scale_color_manual(values = cols_validate[-1])
+    }
+
+    else {
+      plot <- GGally::ggpairs(Design, columns = k, aes(col = .data$NROY, fill = .data$NROY<3), 
+                              upper = list(continuous = GGally::wrap("points", alpha = 0.3, size = size), combo = GGally::wrap("dot_no_facet", alpha = 0.4)),
+                              lower = list(continuous = GGally::wrap("points", alpha = 0.3, size = size), combo = GGally::wrap("dot_no_facet", alpha = 0.4)),
+                              diag = list(continuous = GGally::wrap("densityDiag", alpha = 0.3)),
+                              legend = c(2,1)) +
+        theme_bw() +
+        theme(legend.position = "bottom") + 
+        labs(col = 'Implausibility') +
+        scale_fill_manual(values = cols_validate[-1], guide = 'none') + 
+        viridis::scale_color_viridis()
+    }
+
     # Add truth
     if (!is.null(Truth)){
       Truth$NROY <- NA
-      for(i in 2:length(k)){
+      for (i in 2:length(k)){
         for (j in 1:(i-1)){
           tmp <- Truth
           tmp$input1 <- Truth[,k[j]]
           tmp$input2 <- Truth[,k[i]]
           p1 <- GGally::getPlot(plot, i, j) + geom_point(data = tmp, aes(x = .data$input1, y = .data$input2), col = 'red', shape = 17, size = 4)
           plot <- GGally::putPlot(plot, p1, i, j)
+          p2 <- GGally::getPlot(plot, j, i) + geom_point(data = tmp, aes(x = .data$input2, y = .data$input1), col = 'red', shape = 17, size = 4)
+          plot <- GGally::putPlot(plot, p2, j, i)
         }
       }
     }
