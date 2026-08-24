@@ -162,34 +162,34 @@ FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, o
   
   else if (method %in% c('gp')){
     if (n_em == 1){
-      ems <- BuildGP(Response = output[1], tData = tData, input = input, covariance = covariance, nugget = nugget, ...)
+      ems <- BuildGP(Response = output[1], tData = tData, input = input, mean_fn = mean_fn, covariance = covariance, nugget = nugget, ...)
     }
     
     else {
       ems <- lapply(1:n_em, 
-                    function(k) BuildGP(Response = output[k], tData = tData, input = input, covariance = covariance[k], nugget = nugget[k], ...))
+                    function(k) BuildGP(Response = output[k], tData = tData, input = input, mean_fn = mean_fn[k], covariance = covariance[k], nugget = nugget[k], ...))
     }
   }
   
   else if (method %in% c('dgp', 'dgpsi')){
     if (n_em == 1){
-      ems <- BuildDGP(Response = output[1], tData = tData, input = input, covariance = covariance, nugget = nugget, ...)
+      ems <- BuildDGP(Response = output[1], tData = tData, input = input, mean_fn = mean_fn, covariance = covariance, nugget = nugget, ...)
     }
     
     else {
       ems <- lapply(1:n_em, 
-                    function(k) BuildDGP(Response = output[k], tData = tData, input = input, covariance = covariance[k], nugget = nugget[k], ...))
+                    function(k) BuildDGP(Response = output[k], tData = tData, input = input, mean_fn = mean_fn[k], covariance = covariance[k], nugget = nugget[k], ...))
     }
   }
   
   else if (method %in% c('het', 'Het', 'hetgp', 'hetGP', 'HetGP')){
     if (n_em == 1){
-      ems <- BuildHet(Response = output[1], tData = tData, input = input, covariance = covariance, ...)
+      ems <- BuildHet(Response = output[1], tData = tData, input = input, mean_fn = mean_fn, covariance = covariance, ...)
     }
     
     else {
       ems <- parallel::mclapply(1:n_em, 
-                                function(k) BuildHet(Response = output[k], tData = tData, input = input, covariance = covariance[k], ...),
+                                function(k) BuildHet(Response = output[k], tData = tData, input = input, mean_fn = mean_fn[k], covariance = covariance[k], ...),
                                 mc.cores = n_cores)
     }
   }
@@ -251,7 +251,7 @@ RefitEmulator <- function(emulators, Response, tData = NULL, method = 'rgasp', .
 
 #' Scale design
 #' 
-#' Scales input vectors to a common range.
+#' Scales input parmaeters to a common range.
 #' 
 #' @param design Design to be scaled, where each row as an input vector, each column is a particular input. The column names need to match with those provided in `InputRanges`.
 #' @param InputRanges Matrix or data frame providing input ranges. Should contain 3 columns (name, minimum value, maximum value) which can have any names, with each row corresponding to a different input parameter.
@@ -379,11 +379,7 @@ TrainTestSplit <- function(data, train = 0.75, seed = NULL){
 #' \item{validation_data}{The subset of the data that was not used. If training_prop = 1, this is empty}
 #'
 #' @export
-BuildHet <- function(Response, tData, input = NULL, covariance = 'Matern5_2', ...){
-  
-  #### NOISE MIGHT NOT EXIST, NEED TO SELECT INPUTS BETTER ####
-  # lastCand <- which(names(tData)=="Noise")
-  # n <- dim(tData)[1]
+BuildHet <- function(Response, tData, input = NULL, mean_fn = 'constant', covariance = 'Matern5_2', ...){
   
   ind_response <- which(colnames(tData) == Response)
   
@@ -412,6 +408,17 @@ BuildHet <- function(Response, tData, input = NULL, covariance = 'Matern5_2', ..
     stop('Please provide a valid covariance function for hetGP (Matern5_2, Matern3_2, Gaussian)')
   }
   
+  if (mean_fn == 'linear'){
+    linModel <- lm(paste(Response, '~', paste(colnames(tData_input), collapse = '+')), data = tData)
+    tData_response <- as.numeric(resid(linModel))
+  }
+  
+  # Other option is to provide a specific formula
+  else if (!(mean_fn == 'constant')){
+    linModel <- lm(paste(Response, '~', mean_fn), data = tData)
+    tData_response <- as.numeric(resid(linModel))
+  }
+  
   # Process tData to handle replicates
   het_input <- hetGP::find_reps(X = as.matrix(tData_input), Z = tData_response)
   
@@ -428,6 +435,7 @@ BuildHet <- function(Response, tData, input = NULL, covariance = 'Matern5_2', ..
   return(list(em = em,
               method = 'het',
               response = Response,
+              mean_fn = mean_fn,
               train_data = train_data))
 }
 
@@ -458,8 +466,6 @@ BuildHet <- function(Response, tData, input = NULL, covariance = 'Matern5_2', ..
 #' @export
 BuildGasp <- function(Response, tData, input = NULL, mean_fn = 'constant', linModel = NULL, covariance = 'matern_5_2', nugget = TRUE, maxdf = NULL, ...){
   
-  #### NOISE MIGHT NOT EXIST, NEED TO SELECT INPUTS BETTER ####
-  #lastCand <- which(names(tData)=="Noise")
   n <- nrow(tData)
   ind_response <- which(colnames(tData) == Response)
   
@@ -522,10 +528,6 @@ BuildGasp <- function(Response, tData, input = NULL, mean_fn = 'constant', linMo
     return(list(em = em, lm = linModel, method = 'rgasp', response = Response, mean_fn = mean_fn, train_data = train_data))
   }
   
-  else if (mean_fn == 'constant'){
-    return(list(em = em, method = 'rgasp', response = Response, mean_fn = mean_fn, train_data = train_data))
-  }
-  
   else {
     return(list(em = em, method = 'rgasp', response = Response, mean_fn = mean_fn, train_data = train_data))
   }
@@ -551,7 +553,7 @@ BuildGasp <- function(Response, tData, input = NULL, mean_fn = 'constant', linMo
 #' @export
 #'
 #' @examples
-BuildGP <- function(Response, tData, input = NULL, covariance = 'matern5_2', nugget = TRUE, ...){
+BuildGP <- function(Response, tData, input = NULL, mean_fn = 'constant', covariance = 'matern5_2', nugget = TRUE, ...){
   
   ind_response <- which(colnames(tData) == Response)
   
@@ -575,6 +577,17 @@ BuildGP <- function(Response, tData, input = NULL, covariance = 'matern5_2', nug
   else {
     stop('Please provide a valid covariance function for dgspi::gp (sexp, matern2.5)')
   }
+  
+  if (mean_fn == 'linear'){
+    linModel <- lm(paste(Response, '~', paste(colnames(tData_input), collapse = '+')), data = tData)
+    tData_response <- as.numeric(resid(linModel))
+  }
+  
+  # Other option is to provide a specific formula
+  else if (!(mean_fn == 'constant')){
+    linModel <- lm(paste(Response, '~', mean_fn), data = tData)
+    tData_response <- as.numeric(resid(linModel))
+  }
 
   # Fit emulator
   em <- dgpsi::gp(as.matrix(tData_input), tData_response, name = covariance, nugget = 1e-8, nugget_est = nugget, verb = FALSE, ...)
@@ -584,6 +597,7 @@ BuildGP <- function(Response, tData, input = NULL, covariance = 'matern5_2', nug
   return(list(em = em,
               method = 'gp',
               response = Response,
+              mean_fn = mean_fn,
               train_data = train_data))
 }
 
@@ -602,7 +616,7 @@ BuildGP <- function(Response, tData, input = NULL, covariance = 'matern5_2', nug
 #' @export
 #'
 #' @examples
-BuildDGP <- function(Response, tData, input = NULL, covariance = 'matern5_2', ...){
+BuildDGP <- function(Response, tData, input = NULL, mean_fn = 'constant', covariance = 'matern5_2', ...){
   
   ind_response <- which(colnames(tData) == Response)
   
@@ -627,6 +641,17 @@ BuildDGP <- function(Response, tData, input = NULL, covariance = 'matern5_2', ..
     stop('Please provide a valid covariance function for dgspi::dgp (sexp, matern2.5)')
   }
   
+  if (mean_fn == 'linear'){
+    linModel <- lm(paste(Response, '~', paste(colnames(tData_input), collapse = '+')), data = tData)
+    tData_response <- as.numeric(resid(linModel))
+  }
+  
+  # Other option is to provide a specific formula
+  else if (!(mean_fn == 'constant')){
+    linModel <- lm(paste(Response, '~', mean_fn), data = tData)
+    tData_response <- as.numeric(resid(linModel))
+  }
+  
   # Fit emulator
   em <- dgpsi::dgp(as.matrix(tData_input), tData_response, name = covariance, verb = FALSE, ...)
   
@@ -635,6 +660,7 @@ BuildDGP <- function(Response, tData, input = NULL, covariance = 'matern5_2', ..
   return(list(em = em,
               method = 'dgp',
               response = Response,
+              mean_fn = mean_fn,
               train_data = train_data))
 }
 
@@ -743,7 +769,7 @@ PredictSingle <- function(emulator, design){
 #'
 #' Given an object output by BuildHet, makes predictions for a set of inputs
 #'
-#' @param emulator an object output by BuildHet
+#' @param emulator a single emulator object output by [BuildHet()].
 #' @param design a data frame containing the input parameters, where each row is a point at which to evaluate the emulator
 #'
 #' @returns an object containing the mean, variance (with nugget removed), and nugget variance, at each input location
@@ -756,36 +782,34 @@ PredictHet <- function(emulator, design){
   
   try(hetGP::predict(emulator$em, as.matrix(design)), silent = TRUE)
   
-  preds <- predict(emulator$em, as.matrix(design))
-  return(preds)
-}
-
-
-
-#' Title
-#'
-#' @param emulator 
-#' @param design 
-#'
-#' @returns
-#' @export
-#'
-#' @examples
-PredictDGP <- function(emulator, design){
-  # Ensure columns are ordered in the same way as when the emulator was trained
-  col_names <- colnames(emulator$train_data)[-ncol(emulator$train_data)]
-  design <- design[,col_names]
+  if (emulator$mean_fn == 'constant'){
+    preds <- predict(emulator$em, as.matrix(design))
+  }
   
-  preds <- predict(emulator$em, as.matrix(design))$results
+  else if (emulator$mean_fn == 'linear'){
+    linModel <- lm(paste(emulator$response, '~', paste(colnames(emulator$train_data)[-ncol(emulator$train_data)], collapse = '+')), data = emulator$train_data)
+    linPreds <- predict(linModel, design)
+    preds <- predict(emulator$em, as.matrix(design))
+    preds$mean <- preds$mean + as.numeric(linPreds)
+  }
+  
+  else {
+    linModel <- lm(paste(emulator$response, '~', emulator$mean_fn), data = emulator$train_data)
+    linPreds <- predict(linModel, design)
+    preds <- predict(emulator$em, as.matrix(design))
+    preds$mean <- preds$mean + as.numeric(linPreds)
+  }
+  
   return(preds)
 }
+
 
 #' Evaluating GaSP emulator predictions
 #' 
 #' Given an object output by BuildGasp, makes predictions for a set of inputs
 #' 
-#' @param Design a data frame containing the input parameters, where each row is a point at which to evaluate the emulator
-#' @param emulator an object output by BuildGasp (requires mean_fn, active etc.)
+#' @param emulator a single emulator object output by [BuildGasp()].
+#' @param design a data frame containing the input parameters, where each row is a point at which to evaluate the emulator
 #' 
 #' @returns an object containing the mean, standard deviation, and lower and upper bounds of the 95% posterior credible interval (see predict,rgasp-method)
 #' 
@@ -824,7 +848,42 @@ PredictGasp <- function(emulator, design){
 
 
 
+#' Evaluating dgpsi emulator predictions
+#'
+#' 
+#'
+#' @param emulator a single emulator object output by [BuildGP()] or [BuildDGP()].
+#' @param design a data frame containing the input parameters, where each row is a point at which to evaluate the emulator
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+PredictDGP <- function(emulator, design){
+  # Ensure columns are ordered in the same way as when the emulator was trained
+  col_names <- colnames(emulator$train_data)[-ncol(emulator$train_data)]
+  design <- design[,col_names]
+  
+  if (emulator$mean_fn == 'constant'){
+    preds <- predict(emulator$em, as.matrix(design))$results
+  }
+  
+  else if (emulator$mean_fn == 'linear'){
+    linModel <- lm(paste(emulator$response, '~', paste(colnames(emulator$train_data)[-ncol(emulator$train_data)], collapse = '+')), data = emulator$train_data)
+    linPreds <- predict(linModel, design)
+    preds <- predict(emulator$em, as.matrix(design))$results
+    preds$mean <- preds$mean + as.numeric(linPreds)
+  }
+  
+  else {
+    linModel <- lm(paste(emulator$response, '~', emulator$mean_fn), data = emulator$train_data)
+    linPreds <- predict(linModel, design)
+    preds <- predict(emulator$em, as.matrix(design))$results
+    preds$mean <- preds$mean + as.numeric(linPreds)
+  }
 
+  return(preds)
+}
 
 
 
@@ -1085,12 +1144,38 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs =
   
   if (emulator$method %in% c('gp', 'dgp')){
     loo_preds <- dgpsi::validate(emulator$em, verb = FALSE)$loo
-    loo_preds$lower <- loo_preds$lower
-    loo_preds$upper <- loo_preds$upper
+    
+    if (emulator$mean_fn == 'linear'){
+      linModel <- lm(paste(emulator$response, '~', paste(colnames(emulator$train_data)[-ncol(emulator$train_data)], collapse = '+')), data = emulator$train_data)
+      linPreds <- predict(linModel)
+      loo_preds$mean <- loo_preds$mean + as.numeric(linPreds)
+    }
+    
+    else if (!(emulator$mean_fn == 'constant')) {
+      linModel <- lm(paste(emulator$response, '~', emulator$mean_fn), data = emulator$train_data)
+      linPreds <- predict(linModel)
+      loo_preds$mean <- loo_preds$mean + as.numeric(linPreds)
+    }
+    
+    loo_preds$lower <- loo_preds$mean + stats::qnorm(interval[1])*loo_preds$std
+    loo_preds$upper <- loo_preds$mean + stats::qnorm(interval[2])*loo_preds$std
   }
   
   if (emulator$method == 'het'){
     loo_preds <- hetGP::LOO_preds(emulator$em)
+    
+    if (emulator$mean_fn == 'linear'){
+      linModel <- lm(paste(emulator$response, '~', paste(colnames(emulator$train_data)[-ncol(emulator$train_data)], collapse = '+')), data = emulator$train_data)
+      linPreds <- predict(linModel)
+      loo_preds$mean <- loo_preds$mean + as.numeric(linPreds)
+    }
+    
+    else if (!(emulator$mean_fn == 'constant')) {
+      linModel <- lm(paste(emulator$response, '~', emulator$mean_fn), data = emulator$train_data)
+      linPreds <- predict(linModel)
+      loo_preds$mean <- loo_preds$mean + as.numeric(linPreds)
+    }
+    
     loo_preds$lower <- loo_preds$mean + stats::qnorm(interval[1])*sqrt(loo_preds$sd2)
     loo_preds$upper <- loo_preds$mean + stats::qnorm(interval[2])*sqrt(loo_preds$sd2)
   }
