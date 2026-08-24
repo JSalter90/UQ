@@ -30,7 +30,7 @@ cols_good <- viridis::viridis(100)[65]
 #' 
 #' @export
 FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, output_cols = NULL, 
-                         covariance = 'matern5_2', nugget = TRUE, ...){
+                         mean_fn = 'constant', covariance = 'matern5_2', nugget = TRUE, ...){
   
   n <- nrow(tData)
   p1 <- ncol(tData)
@@ -102,15 +102,60 @@ FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, o
   # Relabel
   input <- 1:length(input)
   
+  # If n_em > 1, check that either correct number of mean/cov/nugget assumptions provided, or 1 is provided for all
+  if (n_em > 1){
+    n_mean <- length(mean_fn)
+    if (n_mean == 1){
+      mean_fn <- rep(mean_fn, n_em)
+    }
+    else {
+      if (!(n_mean == n_em)){
+        stop('Incorrect number of mean functions provided. Please provide either 1, or the same number as the number of outputs to be emulated')
+      }
+    }
+    
+    n_cov <- length(covariance)
+    if (n_cov == 1){
+      covariance <- rep(covariance, n_em)
+    }
+    else {
+      if (!(n_cov == n_em)){
+        stop('Incorrect number of covariance functions provided. Please provide either 1, or the same number as the number of outputs to be emulated')
+      }
+    }
+    
+    n_nugget <- length(nugget)
+    if (n_nugget == 1){
+      nugget <- rep(nugget, n_em)
+    }
+    else {
+      if (!(n_nugget == n_em)){
+        stop('Incorrect number of nugget assumptions provided. Please provide either 1, or the same number as the number of outputs to be emulated')
+      }
+    }
+  }
+  
+  if (n_em == 1){
+    if (length(mean_fn) > 1){
+      stop('Incorrect number of mean functions provided. Please provide either 1, or the same number as the number of outputs to be emulated')
+    }
+    if (length(covariance) > 1){
+      stop('Incorrect number of covariance functions provided. Please provide either 1, or the same number as the number of outputs to be emulated')
+    }
+    if (length(nugget) > 1){
+      stop('Incorrect number of nugget assumptions provided. Please provide either 1, or the same number as the number of outputs to be emulated')
+    }
+  }
+
   # Fit emulator(s)
   if (method %in% c('rgasp', 'gasp', 'Rgasp', 'Gasp')){
     if (n_em == 1){
-      ems <- BuildGasp(Response = output[1], tData = tData, input = input, covariance = covariance, nugget = nugget, ...)
+      ems <- BuildGasp(Response = output[1], tData = tData, input = input, mean_fn = mean_fn, covariance = covariance, nugget = nugget, ...)
     }
     
     else {
-      ems <- parallel::mclapply(output, 
-                                function(k) BuildGasp(Response = k, tData = tData, input = input, covariance = covariance, nugget = nugget, ...),
+      ems <- parallel::mclapply(1:n_em, 
+                                function(k) BuildGasp(Response = output[k], tData = tData, input = input, mean_fn = mean_fn[k], covariance = covariance[k], nugget = nugget[k], ...),
                                 mc.cores = n_cores)
     }
   }
@@ -121,8 +166,8 @@ FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, o
     }
     
     else {
-      ems <- lapply(output, 
-                    function(k) BuildGP(Response = k, tData = tData, input = input, covariance = covariance, nugget = nugget, ...))
+      ems <- lapply(1:n_em, 
+                    function(k) BuildGP(Response = output[k], tData = tData, input = input, covariance = covariance[k], nugget = nugget[k], ...))
     }
   }
   
@@ -132,8 +177,8 @@ FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, o
     }
     
     else {
-      ems <- lapply(output, 
-                    function(k) BuildDGP(Response = k, tData = tData, input = input, covariance = covariance, nugget = nugget, ...))
+      ems <- lapply(1:n_em, 
+                    function(k) BuildDGP(Response = output[k], tData = tData, input = input, covariance = covariance[k], nugget = nugget[k], ...))
     }
   }
   
@@ -143,8 +188,8 @@ FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, o
     }
     
     else {
-      ems <- parallel::mclapply(output, 
-                                function(k) BuildHet(Response = k, tData = tData, input = input, covariance = covariance, ...),
+      ems <- parallel::mclapply(1:n_em, 
+                                function(k) BuildHet(Response = output[k], tData = tData, input = input, covariance = covariance[k], ...),
                                 mc.cores = n_cores)
     }
   }
@@ -396,7 +441,7 @@ BuildHet <- function(Response, tData, input = NULL, covariance = 'Matern5_2', ..
 #' 
 #' @param Response a string indicating which output is being emulated. Must be consistent with a column of tData
 #' @param tData data frame containing (in order): a) the design, b) a column containing noise, c) the basis coefficients
-#' @param mean_fn the structure allowed in the mean function. If NULL, fits a constant mean model. If 'linear', fits a model with a linear term in each of the inputs. If 'step', selects a mean function via stepwise regression
+#' @param mean_fn the structure allowed in the mean function. The default is `constant`, which estimates a constant mean. If 'linear', fits a model with a linear term in each of the inputs. If 'step', selects a mean function via stepwise regression
 #' @param training_prop proportion of the data to use to fit the model, sampled at random
 #' @param Fouriers if fitting a mean function via step, should Fourier terms be considered?
 #' @param linModel defaults to NULL. If not, gives an object of type 'lm' to be used as the mean function
@@ -404,15 +449,14 @@ BuildHet <- function(Response, tData, input = NULL, covariance = 'Matern5_2', ..
 #' @param maxdf maximum number of terms allowed in the mean function, if step used. Defaults to 0.1*size of training data
 #' 
 #' @returns \item{em}{An rgasp emulator}
-#' \item{em_lm}{If mean_fn = 'step', the regression model that was fitted}
 #' \item{active}{If mean_fn = 'step', the variables that were deemed to be active}
-#' \item{type}{Label indicating that the emulator was fitted with rgasp}
+#' \item{method}{Label indicating that the emulator was fitted with rgasp}
 #' \item{mean_fn}{Label indicating the type of mean function used}
 #' \item{train_data}{The subset of the data that was used to fit the emulator}
 #' \item{validation_data}{The subset of the data that was not used. If training_prop = 1, this is empty}
 #' 
 #' @export
-BuildGasp <- function(Response, tData, input = NULL, mean_fn = NULL, linModel = NULL, covariance = 'matern_5_2', nugget = TRUE, maxdf = NULL, ...){
+BuildGasp <- function(Response, tData, input = NULL, mean_fn = 'constant', linModel = NULL, covariance = 'matern_5_2', nugget = TRUE, maxdf = NULL, ...){
   
   #### NOISE MIGHT NOT EXIST, NEED TO SELECT INPUTS BETTER ####
   #lastCand <- which(names(tData)=="Noise")
@@ -446,20 +490,18 @@ BuildGasp <- function(Response, tData, input = NULL, mean_fn = NULL, linModel = 
   }
   
   # 'Trend' option defines mean function
-  # e.g. have column of 1s for intercept, thereafter parameters
-  # So for linear mean, just repeat design after column of 1s
-  if (is.null(mean_fn)){
+  # Default is constant
+  if (mean_fn == 'constant'){
     em <- RobustGaSP::rgasp(design = tData_input, response = tData_response, kernel_type = covariance, nugget.est = nugget, ...)
   }
   
   else if (mean_fn == 'linear'){
+    # For linear mean, design matrix is columns of 1s followed by design
     X <- cbind(rep(1,n), tData_input)
     em <- RobustGaSP::rgasp(design = tData_input, response = tData_response, trend = as.matrix(X), kernel_type = covariance, nugget.est = nugget, ...)
   }
 
   else if (mean_fn == 'lm'){
-    em_lm <- mean_fn
-    #X <- model.matrix(linModel)
     # In case linear model wasn't fitted with exact same data:
     tt <- stats::terms(linModel)
     tt <- stats::delete.response(tt)
@@ -468,15 +510,23 @@ BuildGasp <- function(Response, tData, input = NULL, mean_fn = NULL, linModel = 
     em <- RobustGaSP::rgasp(design = tData_input, response = tData_response, trend = as.matrix(X), kernel_type = covariance, nugget.est = nugget, ...)
   }
   
-  if (!is.null(mean_fn)){
-    if (mean_fn == 'lm'){
-      return(list(em = em, lm = linModel, method = 'rgasp', response = Response, mean_fn = mean_fn, train_data = train_data))
-    }
-    else {
-      return(list(em = em, method = 'rgasp', response = Response, mean_fn = mean_fn, train_data = train_data))
-    }
+  # Other option is to provide a specific formula
+  else {
+    # Create model matrix
+    mm <- stats::model.frame(paste('~', mean_fn), tData_input)
+    X <- stats::model.matrix(mm, tData_input)
+    em <- RobustGaSP::rgasp(design = tData_input, response = tData_response, trend = as.matrix(X), kernel_type = covariance, nugget.est = nugget, ...)
   }
-  if (is.null(mean_fn)){
+  
+  if (mean_fn == 'lm'){
+    return(list(em = em, lm = linModel, method = 'rgasp', response = Response, mean_fn = mean_fn, train_data = train_data))
+  }
+  
+  else if (mean_fn == 'constant'){
+    return(list(em = em, method = 'rgasp', response = Response, mean_fn = mean_fn, train_data = train_data))
+  }
+  
+  else {
     return(list(em = em, method = 'rgasp', response = Response, mean_fn = mean_fn, train_data = train_data))
   }
 }
@@ -604,10 +654,19 @@ Predict <- function(emulator, design){
   # Find number of emulators
   if (!(is.null(emulator$method))){
     n_em <- 1
+    all_inputs <- colnames(emulator$train_data)[-ncol(emulator$train_data)]
   }
   
   else {
     n_em <- length(emulator)
+    all_inputs <- unlist(lapply(1:n_em, function(k) colnames(emulator[[k]]$train_data)[-ncol(emulator[[k]]$train_data)]))
+    all_inputs <- unique(all_inputs)
+  }
+
+  # Check all required inputs have been provided
+  if (!(all(all_inputs %in% colnames(design)))){
+    missing_inputs <- all_inputs[which(!(all_inputs %in% colnames(design)))]
+    stop(paste('design is missing the following inputs that were used to train emulator, please provide:', paste(missing_inputs, collapse = ', ')))
   }
   
   Expectation <- Variance <- matrix(0, nrow = nrow(design), ncol = n_em)
@@ -721,13 +780,6 @@ PredictDGP <- function(emulator, design){
   return(preds)
 }
 
-
-
-
-
-
-#### need to handle noise ####
-
 #' Evaluating GaSP emulator predictions
 #' 
 #' Given an object output by BuildGasp, makes predictions for a set of inputs
@@ -739,38 +791,15 @@ PredictDGP <- function(emulator, design){
 #' 
 #' @export
 PredictGasp <- function(emulator, design){
-  #### REMOVE, LIKELY REDUNDANT ####
-  # if (class(emulator) == 'rgasp'){
-  #   noise_ind <- colnames(design) == 'Noise'
-  #   if (sum(noise_ind) > 0){
-  #     noise_ind <- which(colnames(design) == 'Noise')
-  #     design <- design[,c(1:(noise_ind-1))]
-  #   }
-  #   preds <- predict(emulator, design)
-  # }
+  # Ensure columns are ordered in the same way as when the emulator was trained
+  col_names <- colnames(emulator$train_data)[-ncol(emulator$train_data)]
+  design <- design[,col_names]
   
-  if (is.null(emulator$mean_fn)){
-    noise_ind <- colnames(design) == 'Noise'
-    if (sum(noise_ind) > 0){
-      noise_ind <- which(colnames(design) == 'Noise')
-      design <- design[,c(1:(noise_ind-1))]
-    }
-    # Need to make sure columns are ordered in the same way as when the emulator was trained
-    col_names <- colnames(emulator$train_data)[-ncol(emulator$train_data)]
-    design <- design[,col_names]
-    
+  if (emulator$mean_fn == 'constant'){
     preds <- predict(emulator$em, design)
   }
   
   else if (emulator$mean_fn == 'linear'){
-    noise_ind <- colnames(design) == 'Noise'
-    if (sum(noise_ind) > 0){
-      noise_ind <- which(colnames(design) == 'Noise')
-      design <- design[,c(1:(noise_ind-1))]
-    }
-    # Need to make sure columns are ordered in the same way as when the emulator was trained
-    col_names <- colnames(emulator$train_data)[-ncol(emulator$train_data)]
-    design <- design[,col_names]
     X <- cbind(rep(1,dim(design)[1]), design)
     preds <- predict(emulator$em, design, testing_trend = as.matrix(X))
   }
@@ -778,13 +807,17 @@ PredictGasp <- function(emulator, design){
   else if (emulator$mean_fn == 'lm'){
     tt <- stats::terms(emulator$lm)
     Terms <- stats::delete.response(tt)
-    # Ensure columns are ordered in the same way as when the emulator was trained
-    col_names <- colnames(emulator$train_data)[-ncol(emulator$train_data)]
-    design <- design[,col_names]
     mm <- stats::model.frame(Terms, design, xlev = emulator$lm$xlevels)
     X <- stats::model.matrix(Terms, mm, contrasts.arg = emulator$lm$contrasts)
     preds <- predict(emulator$em, design, testing_trend = as.matrix(X))
   }
+  
+  else {
+    mm <- stats::model.frame(paste('~', emulator$mean_fn), design)
+    X <- stats::model.matrix(mm, design)
+    preds <- predict(emulator$em, design, testing_trend = as.matrix(X))
+  }
+
   return(preds)
 }
 
@@ -1125,7 +1158,7 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs =
 #' @returns Validation plot comparing truth and emulator samples
 #'
 #' @export
-ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output_inds = NULL, data_inds = NULL, plot_sum = FALSE){
+ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output_inds = NULL, data_inds = NULL, plot_sum = FALSE, by_index = FALSE, Obs = NULL){
   
   if (interval <= 0 | interval >= 1){
     stop('interval must be between 0 and 1')
@@ -1141,7 +1174,7 @@ ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output
   preds <- Predict(emulator, design[data_inds,])
 
   # Draw samples
-  Samples <- BasisEmSamples(preds, DataBasis)
+  Samples <- BasisEmSamples(preds, DataBasis, ns = 1000)
   
   # Construct truth
   Truth <- DataBasis$CentredField[,data_inds] + DataBasis$EnsembleMean
@@ -1157,12 +1190,19 @@ ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output
   # Find average or sum across output_inds for each sample, run
   if (plot_sum){
     SamplesSummary <- apply(Samples[output_inds,,], c(2,3), sum)
+    
+    if (!(is.null(Obs))){
+      Obs <- sum(Obs[output_inds])
+    }
   }
   
   else {
     SamplesSummary <- apply(Samples[output_inds,,], c(2,3), mean)
+    
+    if (!(is.null(Obs))){
+      Obs <- mean(Obs[output_inds])
+    }
   }
-  
   
   # Find mean/95% interval of averages for plotting
   SamplesMean <- apply(SamplesSummary, 2, mean)
@@ -1200,15 +1240,39 @@ ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output
     cols[2:3] <- cols_validate[3]
   }
   
-  plot <- ggplot(plot_data, aes(.data$Truth, .data$Mean, col = .data$In95)) +
-    geom_errorbar(aes(ymin = .data$Lower, ymax = .data$Upper), col = cols[1]) +
-    geom_point() +
-    scale_colour_manual(values = c(cols[2:3])) +
-    ggplot2::geom_abline(slope = 1, alpha = 0.6) +
-    labs(y = 'Prediction', title = paste0('Outside ', 100*diff(interval), '% = ', perc_outside, '%')) +
-    theme_bw() +
-    theme(legend.position = 'none')
+  if (by_index){
+    plot_data$ind <- 1:length(plot_data$Mean)
+    plot <- ggplot(plot_data, aes(.data$ind, .data$Mean)) +
+      geom_errorbar(aes(ymin = .data$Lower, ymax = .data$Upper), col = cols[1]) +
+      geom_point(col = cols[1]) +
+      geom_point(aes(x = .data$ind, y = .data$Truth, col = .data$In95)) +
+      scale_colour_manual(values = c(cols[2:3])) +
+      labs(y = 'Prediction', x = 'Index', title = paste0('Outside ', 100*diff(interval), '% = ', perc_outside, '%')) +
+      theme_bw() +
+      theme(legend.position = 'none')
+    
+    if (!(is.null(Obs))){
+      plot <- plot + geom_hline(aes(yintercept = as.numeric(Obs)), linetype = 'dashed')
+    }
+  }
   
+  else {
+    plot <- ggplot(plot_data, aes(.data$Truth, .data$Mean, col = .data$In95)) +
+      geom_errorbar(aes(ymin = .data$Lower, ymax = .data$Upper), col = cols[1]) +
+      geom_point() +
+      scale_colour_manual(values = c(cols[2:3])) +
+      ggplot2::geom_abline(slope = 1, alpha = 0.6) +
+      labs(y = 'Prediction', title = paste0('Outside ', 100*diff(interval), '% = ', perc_outside, '%')) +
+      theme_bw() +
+      theme(legend.position = 'none')
+    
+    if (!(is.null(Obs))){
+      plot <- plot + 
+        geom_hline(aes(yintercept = as.numeric(Obs)), linetype = 'dashed') + 
+        geom_vline(aes(xintercept = as.numeric(Obs)), linetype = 'dashed')
+    }
+  }
+
   return(plot)
 }
 
