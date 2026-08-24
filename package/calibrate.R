@@ -25,14 +25,14 @@
 #' @param obs_inds If the observation vector is a subset of the full output as contained in `DataBasis$tBasis`, this selects the indices from the full output that correspond to observations. Defaults to `NULL`, which corresponds to all outputs observed.
 #' @param TrueOutput The actual simulator output corresponding to `design`, so that the 'true' implausibility (i.e., with the exact output and zero variance) is calculated. Defaults to `NULL`. If provided, number of columns needs to be consistent with length of `Obs`.
 #' @param PreviousWave The previous wave of history matching, containing a set of points that are in the current NROY space. Should be the output of a previous evaluation of `HistoryMatch`, or contain the same fields.
-#' @param ... kmax, etc.
+#' @param ... kmax, threshold, etc.
 #' 
 #' @returns \item{Impl}{The implausibility for each input, corresponding to the rows of `design`. If calculating multiple 1D implausibilities, output is a matrix with the corresponding number of columns.}
 #' \item{NROY}{The proportion of points that are in NROY space.}
 #' \item{inNROY}{A logical vector indicating which points are in NROY space.}
 #' \item{Pass_kth}{If 1D implausibility, provides the proportion of points that are in each marginal NROY, i.e. according to each observation independently.}
 #' \item{Pass_N}{If 1D implausibility, provides the proportion of points that are in the marginal NROY space for N of the k provided constraints, for N=0,...k.}
-#' \item{bound}{If multivariate implausibility, reports the bound that was used to rule out points.}
+#' \item{threshold}{The implausibility threshold that was used to rule out points.}
 #' \item{Design}{The inputs that the implausibility was evaluated at, with a column added to indicate whether each input vector is in the current NROY space, with the wave number appended. E.g., this column is labelled 'NROY1' if `PreviousWave` was not provided. If `PreviousWave` was provided, appends 'NROYk' for current wave k, and keeps all previous NROYs.}
 #' \item{Preds}{The predictions at the provided inputs, including `$Expectation` and `$Variance`. If `TrueOutput` was provided instead, returns this as the expectation, and zeros as the variance.}
 #' \item{wave}{The current wave number. Set to 1 if `PreviousWave` was not provided, else adds 1 to `PreviousWave$wave`.}
@@ -147,14 +147,14 @@ HistoryMatch <- function(emulator = NULL, design = NULL, DataBasis = NULL, Obs, 
   }
   
   if (Multivariate){
-    return(list(Impl = impl$Impl, bound = impl$bound, NROY = impl$NROY, inNROY = impl$inNROY,
+    return(list(Impl = impl$Impl, threshold = impl$threshold, NROY = impl$NROY, inNROY = impl$inNROY,
                 Design = design,
                 Preds = preds,
                 wave = wave))
   }
   
   else {
-    return(list(Impl = impl$Impl, NROY = impl$NROY, Pass_kth = impl$Pass_kth, Pass_N = impl$Pass_N, inNROY = impl$inNROY,
+    return(list(Impl = impl$Impl, threshold = impl$threshold, NROY = impl$NROY, Pass_kth = impl$Pass_kth, Pass_N = impl$Pass_N, inNROY = impl$inNROY,
                 Design = design,
                 Preds = preds,
                 wave = wave))
@@ -176,14 +176,15 @@ HistoryMatch <- function(emulator = NULL, design = NULL, DataBasis = NULL, Obs, 
 #' @param obs_inds If the observation vector is a subset of the full output as contained in `DataBasis$tBasis`, this selects the indices from the full output that correspond to observations. Defaults to `NULL`, which corresponds to all outputs observed.
 #' @param weightinv If not NULL, the inverse of W = var_err + var_disc, used for projection
 #' @param BasisUncertainty Whether to include the variance from deleted basis vectors. Defaults to `TRUE`.
+#' @param threshold The threshold to be used to define NROY space. Defaults to `NULL`, which assumes the 0.995 quantile of the chi-squared distribution with \ell degrees of freedom.
 #' 
-#' @returns \item{impl}{Vector of implausibilities corresponding to the rows of Expectation and Variance}
-#' \item{bound}{The chi-squared bound for an \ell-dimensional field}
-#' \item{nroy}{Proportion of parameter settings that are not ruled out, using bound}
-#' \item{inNROY}{Vector indicating whether a parameter setting is ruled out}
+#' @returns \item{impl}{Vector of implausibilities corresponding to the rows of Expectation and Variance.}
+#' \item{threshold}{The implausibility threshold T that was used to define NROY space.}
+#' \item{nroy}{Proportion of parameter settings that are not ruled out.}
+#' \item{inNROY}{Vector indicating whether a parameter setting is ruled out.}
 #'
 #' @export
-ImplField <- function(Predictions, DataBasis, Obs, ObsVar, DiscVar = 0, obs_inds = NULL, weightinv = NULL, BasisUncertainty = TRUE){
+ImplField <- function(Predictions, DataBasis, Obs, ObsVar, DiscVar = 0, obs_inds = NULL, weightinv = NULL, BasisUncertainty = TRUE, threshold = NULL){
   
   Expectation <- Predictions$Expectation
   Variance <- Predictions$Variance
@@ -300,13 +301,15 @@ ImplField <- function(Predictions, DataBasis, Obs, ObsVar, DiscVar = 0, obs_inds
   impl <- as.numeric(parallel::mclapply(1:n, 
                                         function(i) ImplCoeff(Expectation[i,], Variance[i,], ObsProj, WProj, 0*WProj),
                                         mc.cores = n_cores))
-  impl <- impl + rep(R_W, n) 
-  bound <- stats::qchisq(0.995, length(obs_inds))
-  nroy <- sum(impl < bound)/n
-  inNROY <- impl < bound
+  impl <- impl + rep(R_W, n)
+  if (is.null(threshold)){
+    threshold <- stats::qchisq(0.995, length(obs_inds))
+  }
+  nroy <- sum(impl < threshold)/n
+  inNROY <- impl < threshold
 
   return(list(Impl = impl, 
-              bound = bound, 
+              threshold = threshold,
               NROY = nroy, 
               inNROY = inNROY))
 }
@@ -530,15 +533,15 @@ kth_max <- function(x,k) {
 #' How many inputs pass the kth constraint.
 #'
 #' @param impl Matrix of implausibilities, with each row corresponding to an input vector, and each column corresponding to an output.
-#' @param bound Threshold to use for defining NROY space. Defaults to 3.
+#' @param threshold Threshold to use for defining NROY space. Defaults to 3.
 #'
 #' @returns Proportion of inputs that are in NROY according to each of the given outputs.
 #' @export
 #'
 #' @examples
-pass_kth_metric <- function(impl, bound = 3){
+pass_kth_metric <- function(impl, threshold = 3){
   ns <- nrow(impl)
-  apply(impl < bound, 2, sum) / ns
+  apply(impl < threshold, 2, sum) / ns
 }
 
 #### RENAME? pass_by_run? ####
@@ -547,15 +550,15 @@ pass_kth_metric <- function(impl, bound = 3){
 #' How many inputs pass N/k constraints.
 #'
 #' @param impl Matrix of implausibilities, with each row corresponding to an input vector, and each column corresponding to an output.
-#' @param bound Threshold to use for defining NROY space. Defaults to 3.
+#' @param threshold Threshold to use for defining NROY space. Defaults to 3.
 #'
 #' @returns Proportion of inputs that satisfy N = 0,1,...k of the k constraints.
 #' @export
 #'
 #' @examples
-pass_metric <- function(impl, bound = 3){
+pass_metric <- function(impl, threshold = 3){
   ns <- nrow(impl)
-  summary(as.factor(apply(impl < bound, 1, sum, na.rm = TRUE))) / ns
+  summary(as.factor(apply(impl < threshold, 1, sum, na.rm = TRUE))) / ns
 }
 
 
@@ -569,16 +572,17 @@ pass_metric <- function(impl, bound = 3){
 #' @param ObsVar Observation error variance. If a single value is provided, assumes the observation error is constant and uncorrelated across all outputs provided in `Obs`. Else should be a vector with the same length as `Obs`.
 #' @param DiscVar Discrepancy variance. Defaults to zero as this may be included in `ObsVar`. The same rules apply as for providing `ObsVar`. 
 #' @param kmax Which kth-max implausibility to use to define NROY space. Defaults to 1 (i.e. use the maximum implausibility across all outputs to classify an input).
-#' @param bound Threshold to use for defining NROY space. Defaults to 3.
+#' @param threshold Threshold to use for defining NROY space. Defaults to 3.
 #'
 #' @returns \item{Impl}{The implausibility for each input, corresponding to the rows of `design`. If calculating multiple implausibilities, output is a matrix with the corresponding number of columns.}
+#' \item{threshold}{The implausibility threshold T that was used to define NROY space.}
 #' \item{NROY}{The proportion of points that are in NROY space.}
 #' \item{inNROY}{A logical vector indicating which points are in NROY space.}
 #' \item{Pass_kth}{The proportion of points that are in each marginal NROY, i.e. according to each observation independently.}
 #' \item{Pass_N}{The proportion of points that are in the marginal NROY space for N of the k provided constraints, for N=0,...k.}
 #'
 #' @export
-Impl <- function(Predictions, Obs, ObsVar, DiscVar = 0, kmax = 1, bound = 3){
+Impl <- function(Predictions, Obs, ObsVar, DiscVar = 0, kmax = 1, threshold = 3){
 
   Expectation <- Predictions$Expectation
   Variance <- Predictions$Variance
@@ -623,17 +627,18 @@ Impl <- function(Predictions, Obs, ObsVar, DiscVar = 0, kmax = 1, bound = 3){
   impl <- matrix(unlist(impl), n, ell)
 
   # Proportion of samples that pass each metric individually
-  pass_kth <- pass_kth_metric(impl, bound)
+  pass_kth <- pass_kth_metric(impl, threshold)
   
   # Number of constraints passed by each sample
-  pass_N <- pass_metric(impl, bound)
+  pass_N <- pass_metric(impl, threshold)
   
   # Defining NROY based on kmax
   impl_kmax <- apply(impl, 1, kth_max, k = kmax)
-  nroy <- mean(impl_kmax < bound)
-  inNROY <- impl_kmax < bound
+  nroy <- mean(impl_kmax < threshold)
+  inNROY <- impl_kmax < threshold
 
   return(list(Impl = impl,
+              threshold = threshold,
               NROY = nroy,
               Pass_kth = pass_kth,
               Pass_N = pass_N,
