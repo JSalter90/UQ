@@ -198,8 +198,6 @@ FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, o
     stop("method not recognised, please provide a valid selection (see ?FitEmulator)")
   }
   
-  warning("Currently ignoring noise, fix this!!!")
-  
   return(ems)
 }
 
