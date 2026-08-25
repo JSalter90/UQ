@@ -57,9 +57,12 @@ HistoryMatch <- function(emulator = NULL, design = NULL, DataBasis = NULL, Obs, 
   if (!(is.null(TrueOutput))){
     TrueOutput <- as.matrix(TrueOutput)
   }
+  
+  # Number of outputs to be calibrated to
+  ell <- ifelse(is.null(obs_inds), length(Obs), length(obs_inds))
 
   # If only 1 observation, check only been given a single emulator (or single true output)
-  if (length(Obs) == 1){
+  if (ell == 1){
     if (!(is.null(emulator))){
       if (is.null(emulator$method)){
         stop('1 observation provided, but either too many emulators, or emulator in incorrect format')
@@ -76,32 +79,33 @@ HistoryMatch <- function(emulator = NULL, design = NULL, DataBasis = NULL, Obs, 
   
   # If provided Multivariate = TRUE or FALSE explicitly, check this is compatible with given object lengths
   else if (!(Multivariate == 'auto')){
-    if (Multivariate){
-      if (!(is.null(emulator))){
-        if (!(length(emulator) == length(Obs)) & is.null(DataBasis)){
-          stop('Mismatch between number of observations and number of emulators, or missing a DataBasis object.
-         To do multivariate HM requires either.')
-        }
+    
+    if (Multivariate & !(is.null(emulator))){
+      if (!(length(emulator) == ell) & is.null(DataBasis)){
+        stop('Mismatch between number of observations and number of emulators, or missing a DataBasis object.
+              Setting Multivariate = TRUE requires one of these.')
       }
       
-      else {
-        if (!(ncol(TrueOutput) == length(Obs))){
-          stop('Mismatch between number of observations and number of true outputs.')
+      if (!(length(emulator) == ell) & !(is.null(DataBasis))){
+        check_name <- ifelse(ell == 1, emulator$response, emulator[[1]]$response)
+        if (!(check_name %in% c('C1', 'c1', 'C_1', 'c_1'))){
+          warning('Multivariate implausibility selected, DataBasis provided, and mismatch between number of observations and number of emulators.
+                  Suggests basis emulation, however leading emulator not for C1 (or similar).
+                  If in fact wanted independent emulation, delete DataBasis and check number of observations and emulators match.',
+                  immediate. = TRUE)
         }
       }
     }
     
-    else if (!(Multivariate)){
-      if (!(is.null(emulator))){
-        if (!(length(emulator) == length(Obs))){
-          stop('Mismatch between number of observations and number of emulators, should be identical for 1D implausibility.')
-        }
+    else if (!(Multivariate) & !(is.null(emulator))){
+      if (!(length(emulator) == ell)){
+        stop('Mismatch between number of observations and number of emulators, should be identical for 1D implausibility.')
       }
-      
-      else {
-        if (!(ncol(TrueOutput) == length(Obs))){
-          stop('Mismatch between number of observations and number of true outputs.')
-        }
+    }
+    
+    else if (is.null(emulator)){
+      if (!(ncol(TrueOutput) == ell)){
+        stop('Mismatch between number of observations and number of true outputs.')
       }
     }
   }
@@ -109,21 +113,19 @@ HistoryMatch <- function(emulator = NULL, design = NULL, DataBasis = NULL, Obs, 
   # Determine whether HM in 1D across multiple metrics, or have basis emulator
   else if (Multivariate == 'auto') {
     if (!(is.null(emulator))){
-      Multivariate <- ifelse(length(emulator) == length(Obs), FALSE, TRUE)
+      Multivariate <- ifelse(length(emulator) == ell, FALSE, TRUE)
+      if (Multivariate & is.null(DataBasis)){
+        stop('Provided q emulators and ell != q observations to calibrate to. Either provide DataBasis, or ensure ell = q.')
+      }
     }
     
     else {
-      Multivariate <- ifelse(ncol(TrueOutput) == length(Obs) & length(Obs) < 50, FALSE, TRUE)
+      Multivariate <- ifelse(ncol(TrueOutput) == ell & ell < 50, FALSE, TRUE)
     }
   }
-  
-  if (Multivariate & is.null(DataBasis) & is.null(TrueOutput)){
-    stop('Mismatch between number of observations and either number of emulators or number of true outputs. 
-         Either ensure these match up, or provide a DataBasis object.')
-  }
-  
+
   if (is.null(design) & is.null(PreviousWave)){
-    stop('Requires design if there is no PreviousWave to inherit this from')
+    stop('Requires design if there is no PreviousWave to inherit this from.')
   }
   
   # Find wave number (for clear labelling of NROY spaces when multiple waves)
@@ -156,12 +158,15 @@ HistoryMatch <- function(emulator = NULL, design = NULL, DataBasis = NULL, Obs, 
   
   # If a subset is not selected, use all outputs
   if (is.null(obs_inds) & Multivariate){
-    ell <- ifelse(!(is.null(DataBasis)), nrow(DataBasis$tBasis), ncol(TrueOutput))
     obs_inds <- 1:ell
   }
 
-  if (Multivariate & is.null(TrueOutput)){
+  if (Multivariate & is.null(TrueOutput) & !(length(obs_inds) == ncol(preds$Expectation))){
     impl <- ImplField(preds, DataBasis, Obs = Obs, ObsVar = ObsVar, DiscVar = DiscVar, obs_inds = obs_inds, ...)
+  }
+  
+  else if (Multivariate & is.null(TrueOutput) & length(obs_inds) == ncol(preds$Expectation)){
+    impl <- ImplFieldIndEm(preds, Obs = Obs, ObsVar = ObsVar, DiscVar = DiscVar, ...)
   }
   
   else if (Multivariate & !(is.null(TrueOutput))){
@@ -355,6 +360,104 @@ ImplField <- function(Predictions, DataBasis, Obs, ObsVar, DiscVar = 0, obs_inds
               NROY = nroy, 
               inNROY = inNROY))
 }
+
+
+
+
+#' High-dimensional implausibility with independent emulators
+#'
+#' Calculates the implausibility (for the \ell-dimensional field) for a set of predictions (expectations, variances) for each output.
+#' 
+#' Applies the decomposition from Salter & Williamson (2022), first calculating the constant term (difference between the observations and its basis representation), and adding the coefficient implausibility.
+#'
+#' @param Predictions A list containing components `$Expectation` and `$Variance`, where each provide the emulator expectation/variance for a set of inputs, where the rows contains the expectations/variances for different inputs, and the columns contain the emulated outputs. The output of `Predict` can be provided here.
+#' @param Obs The observations z, a vector of length l. Should not be centered as this happens internally if required, according to `DataBasis$EnsembleMean`.
+#' @param ObsVar Observation error variance matrix. If a single value is provided, assumes the observation error is constant and uncorrelated across all outputs provided in `Obs`. In the case of l independent outputs, can be provided as a vector of length l. In the case of the multivariate implausibility, needs to be an lxl matrix.
+#' @param DiscVar Discrepancy variance matrix. Defaults to zero as it is possible to set `ObsVar` as the sum of the observation error variance and the discrepancy variance, given that internally these two terms are treated independently and summed. The same rules apply as for providing `ObsVar`. 
+#' @param threshold The threshold used to define NROY space. Defaults to `NULL`, which assumes the 0.995 quantile of the chi-squared distribution with \ell degrees of freedom.
+#' 
+#' @returns \item{impl}{Vector of implausibilities corresponding to the rows of Expectation and Variance.}
+#' \item{threshold}{The implausibility threshold T that was used to define NROY space.}
+#' \item{NROY}{Proportion of parameter settings that are not ruled out.}
+#' \item{inNROY}{Vector indicating whether a parameter setting is ruled out.}
+#'
+#' @export
+ImplFieldIndEm <- function(Predictions, Obs, ObsVar, DiscVar = 0, threshold = NULL){
+  
+  Expectation <- Predictions$Expectation
+  Variance <- Predictions$Variance
+  
+  n <- nrow(Expectation) # number of prediction points
+  ell <- ncol(Expectation) # number of emulated vectors
+
+  if (!(ell == ncol(Variance))){
+    stop('Incorrect number of columns in Variance')
+  }
+  
+  # Check provided observation vector is consistent with the length of the model subset selected 
+  if (!(length(Obs) == ell)){
+    stop('The observation vector is not the same length as the model predictions')
+  }
+  
+  # If provided single variance(s), assume iid
+  if (length(ObsVar) == 1){
+    ObsVar <- ObsVar*diag(ell)
+  }
+  
+  if (length(DiscVar) == 1){
+    DiscVar <- DiscVar*diag(ell)
+  }
+  
+  # If provided a vector of variances, assumes uncorrelated
+  if (length(ObsVar) == ell){
+    ObsVar <- diag(ObsVar)
+  }
+  
+  if (length(DiscVar) == ell){
+    DiscVar <- diag(DiscVar)
+  }
+  
+  # Check whether a vector with incorrect length has been provided
+  if (is.null(nrow(ObsVar))){
+    if (!(length(ObsVar) == ell)){
+      stop('Observations and observation error matrix have inconsistent dimensions')
+    }
+  }
+  
+  # If matrix provided, check has correct dimension
+  else if (!(nrow(ObsVar) == ell) | !(ncol(ObsVar) == ell)){
+    stop('Observations and observation error matrix have inconsistent dimensions')
+  }
+  
+  if (is.null(nrow(DiscVar))){
+    if (!(length(DiscVar) == ell)){
+      stop('Observations and discrepancy variance matrix have inconsistent dimensions')
+    }
+  }
+  
+  # If matrix provided, check has correct dimension
+  else if (!(nrow(DiscVar) == ell) | !(ncol(DiscVar) == ell)){
+    stop('Observations and discrepancy variance matrix have inconsistent dimensions')
+  }
+  
+  W <- ObsVar + DiscVar
+  
+  impl <- as.numeric(parallel::mclapply(1:n, 
+                                        function(i) t(Obs - Expectation[i,]) %*% GetInverse(W + diag(Variance[i,])) %*% c(Obs - Expectation[i,]),
+                                        mc.cores = n_cores))
+  
+  if (is.null(threshold)){
+    threshold <- stats::qchisq(0.995, ell)
+  }
+  nroy <- sum(impl < threshold)/n
+  inNROY <- impl < threshold
+  
+  return(list(Impl = impl, 
+              threshold = threshold,
+              NROY = nroy, 
+              inNROY = inNROY))
+}
+
 
 
 
