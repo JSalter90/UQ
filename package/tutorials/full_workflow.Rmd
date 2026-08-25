@@ -348,7 +348,7 @@ As for the set of 4 individual metrics above, the function `HistoryMatch` will h
 ```{r}
 implFull <- ImplField(predsCoeffs, DataBasis, Obs = obs, ObsVar = 0.5)
 summary(implFull$Impl)
-implFull$bound
+implFull$threshold
 implFull$NROY
 summary(implFull$inNROY)
 ```
