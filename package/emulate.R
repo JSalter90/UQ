@@ -249,7 +249,7 @@ RefitEmulator <- function(emulators, Response, tData = NULL, method = 'rgasp', .
 
 #' Scale design
 #' 
-#' Scales input parmaeters to a common range.
+#' Scales input parameters to a common range.
 #' 
 #' @param design Design to be scaled, where each row as an input vector, each column is a particular input. The column names need to match with those provided in `InputRanges`.
 #' @param InputRanges Matrix or data frame providing input ranges. Should contain 3 columns (name, minimum value, maximum value) which can have any names, with each row corresponding to a different input parameter.
@@ -257,6 +257,7 @@ RefitEmulator <- function(emulators, Response, tData = NULL, method = 'rgasp', .
 #' 
 #' @returns Scaled design, with same dimension as provided design.
 #' 
+#' @export
 ScaleInputs <- function(design, InputRanges, range = c(0,1)){
   
   # Rename columns
@@ -287,7 +288,7 @@ ScaleInputs <- function(design, InputRanges, range = c(0,1)){
 
 #' Unscale design
 #' 
-#' Unscales input vectors to their original range.
+#' Unscales input parameters to their original range.
 #' 
 #' @param scaled_design The scaled design to be unscaled.
 #' @param InputRanges Matrix or data frame providing input ranges. Should contain 3 columns (name, minimum value, maximum value) which can have any names, with each row corresponding to a different input parameter.
@@ -295,6 +296,7 @@ ScaleInputs <- function(design, InputRanges, range = c(0,1)){
 #' 
 #' @returns Unscaled design, with same dimension as provided design.
 #' 
+#' @export
 UnscaleInputs <- function(scaled_design, InputRanges, range = c(0,1)){
   
   # Rename columns
@@ -356,9 +358,6 @@ TrainTestSplit <- function(data, train = 0.75, seed = NULL){
               val_data = val_data,
               val_inds = val_inds))
 }
-
-
-
 
 
 
@@ -685,15 +684,20 @@ BuildDGP <- function(Response, tData, input = NULL, mean_fn = 'constant', covari
 
 
 
-#' Wrapper of 1D predict function for multiple emulators
+#' Emulator prediction
 #' 
+#' Wrapper of 1D predict functions, for single or multiple emulators.
 #' 
-#' @param emulator 
-#' @param design 
+#' @param emulator A single emulator, or list of emulators, usually fitted with [FitEmulators()] or calls of specific functions like [BuildGasp()].
+#' @param design Input data frame, where each row is a point at which to evaluate the emulators. Must contain named columns for all inputs that were used in training the provided emulators.
 #' 
-#' @returns description
+#' @returns \item{Expectation}{A matrix containing emulator expectations, where the rows correspond to the rows of `design`, and the columns correspond to `emulator`.}
+#' \item{Variance}{A matrix containing emulator variances, arranged in same way as `Expectation`.}
 #' 
 #' @export
+#' 
+#' @examples
+#' # example code
 Predict <- function(emulator, design){
 
   # Find number of emulators
@@ -741,14 +745,15 @@ Predict <- function(emulator, design){
 
 
 
-#' Title
+#' Single prediction
+#' 
+#' Helper function to allow easier paralellisation of predictions. Not exported, call [Predict()] instead.
 #'
-#' @param emulator 
-#' @param design 
+#' @param emulator A single emulator, usually fitted with [FitEmulators()] or calls of specific functions like [BuildGasp()].
+#' @param design Input data frame, where each row is a point at which to evaluate the emulators. Must contain named columns for all inputs that were used in training the provided emulator.
 #'
-#' @returns
-#'
-#' @examples
+#' @returns Emulator expectatin and variance at each design point.
+#' 
 PredictSingle <- function(emulator, design){
   
   # Check whether all required inputs are contained in design
@@ -786,12 +791,12 @@ PredictSingle <- function(emulator, design){
 
 #' Evaluating hetGP emulator predictions
 #'
-#' Given an object output by BuildHet, makes predictions for a set of inputs
+#' Given an object output by [BuildHet()], makes predictions for a set of inputs.
 #'
-#' @param emulator a single emulator object output by [BuildHet()].
-#' @param design a data frame containing the input parameters, where each row is a point at which to evaluate the emulator
+#' @param emulator A single emulator object output by [BuildHet()].
+#' @param design Input data frame, where each row is a point at which to evaluate the emulator. Must contain named columns for all inputs that were used in training the provided emulator.
 #'
-#' @returns an object containing the mean, variance (with nugget removed), and nugget variance, at each input location
+#' @returns An object containing the mean, variance (with nugget removed), and nugget variance, at each input location.
 #'
 #' @export
 PredictHet <- function(emulator, design){
@@ -825,12 +830,12 @@ PredictHet <- function(emulator, design){
 
 #' Evaluating GaSP emulator predictions
 #' 
-#' Given an object output by BuildGasp, makes predictions for a set of inputs
+#' Given an object output by [BuildGasp()], makes predictions for a set of inputs.
 #' 
-#' @param emulator a single emulator object output by [BuildGasp()].
-#' @param design a data frame containing the input parameters, where each row is a point at which to evaluate the emulator
+#' @param emulator A single emulator object output by [BuildGasp()].
+#' @param design Input data frame, where each row is a point at which to evaluate the emulator. Must contain named columns for all inputs that were used in training the provided emulator.
 #' 
-#' @returns an object containing the mean, standard deviation, and lower and upper bounds of the 95% posterior credible interval (see predict,rgasp-method)
+#' @returns An object containing the mean, standard deviation, and lower and upper bounds of the 95% posterior credible interval (see predict,rgasp-method).
 #' 
 #' @export
 PredictGasp <- function(emulator, design){
@@ -869,12 +874,13 @@ PredictGasp <- function(emulator, design){
 
 #' Evaluating dgpsi emulator predictions
 #'
+#' Given an object output by [BuildGP()] or [BuildDGP()], makes predictions for a set of inputs.
+#'
+#' @param emulator A single emulator object output by [BuildGP()] or [BuildDGP()].
+#' @param design Input data frame, where each row is a point at which to evaluate the emulator. Must contain named columns for all inputs that were used in training the provided emulator.
+#'
+#' @returns An object containing the mean and variance at each input location.
 #' 
-#'
-#' @param emulator a single emulator object output by [BuildGP()] or [BuildDGP()].
-#' @param design a data frame containing the input parameters, where each row is a point at which to evaluate the emulator
-#'
-#' @returns
 #' @export
 #'
 #' @examples
@@ -969,7 +975,8 @@ Validate <- function(emulator, valData, interval = 0.95, by_input = FALSE, by_in
 #' @param IndivPars Create plots for each input
 #'
 #' @returns an object containing the mean, variance (with nugget removed), and nugget variance, at each input location
-#'
+#' 
+#' @export
 ValidateSingle <- function(emulator, valData, interval = 0.95, by_input = FALSE, by_index = FALSE, Obs = NULL){
   
   if (interval <= 0 | interval >= 1){
@@ -1145,6 +1152,7 @@ LeaveOneOut <- function(emulator, interval = 0.95, Obs = NULL, by_index = FALSE)
 #' 
 #' @returns description
 #' 
+#' @export
 LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs = NULL){
 
   if (interval <= 0 | interval >= 1){
