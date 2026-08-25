@@ -588,7 +588,7 @@ BuildGP <- function(Response, tData, input = NULL, mean_fn = 'constant', covaria
   }
 
   # Fit emulator
-  em <- dgpsi::gp(as.matrix(tData_input), tData_response, name = covariance, nugget = 1e-8, nugget_est = nugget, verb = FALSE, ...)
+  em <- dgpsi::gp(as.matrix(tData_input), tData_response, name = covariance, nugget_est = nugget, verb = FALSE, ...)
 
   train_data <- tData[,c(input, ind_response)]
   
@@ -614,7 +614,7 @@ BuildGP <- function(Response, tData, input = NULL, mean_fn = 'constant', covaria
 #' @export
 #'
 #' @examples
-BuildDGP <- function(Response, tData, input = NULL, mean_fn = 'constant', covariance = 'matern5_2', ...){
+BuildDGP <- function(Response, tData, input = NULL, mean_fn = 'constant', covariance = 'matern5_2', nugget = TRUE, vecchia = NULL, ...){
   
   ind_response <- which(colnames(tData) == Response)
   
@@ -650,8 +650,12 @@ BuildDGP <- function(Response, tData, input = NULL, mean_fn = 'constant', covari
     tData_response <- as.numeric(resid(linModel))
   }
   
+  if (is.null(vecchia)){
+    vecchia <- ifelse(nrow(tData) >= 500, TRUE, FALSE)
+  }
+  
   # Fit emulator
-  em <- dgpsi::dgp(as.matrix(tData_input), tData_response, name = covariance, verb = FALSE, ...)
+  em <- dgpsi::dgp(as.matrix(tData_input), tData_response, name = covariance, nugget_est = nugget, verb = FALSE, vecchia = vecchia, ...)
   
   train_data <- tData[,c(input, ind_response)]
   
