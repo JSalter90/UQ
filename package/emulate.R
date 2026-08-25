@@ -363,18 +363,22 @@ TrainTestSplit <- function(data, train = 0.75, seed = NULL){
 
 
 
-#' Building a single hetGP emulator
+#' Building a single HetGP emulator
 #'
-#' Given tData object, fit an emulator for the selected coefficient
+#' Given emulator assumptions and training data, fits an emulator for the selected output using HetGP.
 #'
-#' @param Response a string indicating which output is being emulated. Must be consistent with a column of tData
-#' @param tData data frame containing (in order): a) the design, b) a column containing noise, c) the basis coefficients
-#' @param ... other arguments to pass to `mleHetGP`
+#' @param Response A string indicating which output is being emulated. Must be consistent with a column of tData.
+#' @param tData Data frame containing training data. At the mimimum, requires columns relating to the inputs and the `Response` to be emulated.
+#' @param input Column indices corresponding to emulator inputs. Defaults to `NULL`, in which case all columns prior to that containing `Response` are assumed to be inputs.
+#' @param mean_fn The assumed mean function. The default is `constant`, which estimates a constant mean. If `linear`, fits a model with a linear term in each of the inputs. Alternatively, a specific formula can be provided, as long as all inputs included are present in `tData`.
+#' @param covariance Covariance function. Defaults to `matern5_2`.
+#' @param ... Other options to pass to [mleHetGP()].
 #'
-#' @returns \item{em}{An HetGP emulator}
-#' \item{type}{Label indicating that the emulator was fitted with HetGP}
-#' \item{train_data}{The subset of the data that was used to fit the emulator}
-#' \item{validation_data}{The subset of the data that was not used. If training_prop = 1, this is empty}
+#' @returns \item{em}{The fitted HetGP emulator.}
+#' \item{method}{Label indicating that the emulator was fitted with HetGP.}
+#' \item{response}{Name of the emulated output.}
+#' \item{mean_fn}{Which mean function was used.}
+#' \item{train_data}{The subset of the data that was used to fit the emulator. Unlike `tData`, this output contains only the columns relating to the emulator inputs and output.}
 #'
 #' @export
 BuildHet <- function(Response, tData, input = NULL, mean_fn = 'constant', covariance = 'Matern5_2', ...){
@@ -443,26 +447,25 @@ BuildHet <- function(Response, tData, input = NULL, mean_fn = 'constant', covari
 
 #' Building a single GaSP emulator
 #' 
-#' Given tData object, fit an emulator for the selected coefficient
+#' Given emulator assumptions and training data, fits an emulator for the selected output using rgasp.
 #' 
-#' @param Response a string indicating which output is being emulated. Must be consistent with a column of tData
-#' @param tData data frame containing (in order): a) the design, b) a column containing noise, c) the basis coefficients
-#' @param mean_fn the structure allowed in the mean function. The default is `constant`, which estimates a constant mean. If 'linear', fits a model with a linear term in each of the inputs. If 'step', selects a mean function via stepwise regression
-#' @param training_prop proportion of the data to use to fit the model, sampled at random
-#' @param Fouriers if fitting a mean function via step, should Fourier terms be considered?
-#' @param linModel defaults to NULL. If not, gives an object of type 'lm' to be used as the mean function
-#' @param nugget_fit should a nugget be estimated? Defaults to TRUE
+#' @param Response A string indicating which output is being emulated. Must be consistent with a column of tData.
+#' @param tData Data frame containing training data. At the mimimum, requires columns relating to the inputs and the `Response` to be emulated.
+#' @param input Column indices corresponding to emulator inputs. Defaults to `NULL`, in which case all columns prior to that containing `Response` are assumed to be inputs.
+#' @param mean_fn The assumed mean function. The default is `constant`, which estimates a constant mean. If `linear`, fits a model with a linear term in each of the inputs. Alternatively, a specific formula can be provided, as long as all inputs included are present in `tData`.
+#' @param covariance Covariance function. Defaults to `matern5_2`.
+#' @param nugget Logical, whether to estimate a nugget. Defaults to `TRUE`.
 #' @param maxdf maximum number of terms allowed in the mean function, if step used. Defaults to 0.1*size of training data
+#' @param ... Other options to pass to [rgasp()].
 #' 
-#' @returns \item{em}{An rgasp emulator}
-#' \item{active}{If mean_fn = 'step', the variables that were deemed to be active}
-#' \item{method}{Label indicating that the emulator was fitted with rgasp}
-#' \item{mean_fn}{Label indicating the type of mean function used}
-#' \item{train_data}{The subset of the data that was used to fit the emulator}
-#' \item{validation_data}{The subset of the data that was not used. If training_prop = 1, this is empty}
+#' @returns \item{em}{The fitted rgasp emulator.}
+#' \item{method}{Label indicating that the emulator was fitted with rgasp.}
+#' \item{response}{Name of the emulated output.}
+#' \item{mean_fn}{Which mean function was used.}
+#' \item{train_data}{The subset of the data that was used to fit the emulator. Unlike `tData`, this output contains only the columns relating to the emulator inputs and output.}
 #' 
 #' @export
-BuildGasp <- function(Response, tData, input = NULL, mean_fn = 'constant', linModel = NULL, covariance = 'matern_5_2', nugget = TRUE, maxdf = NULL, ...){
+BuildGasp <- function(Response, tData, input = NULL, mean_fn = 'constant', covariance = 'matern_5_2', nugget = TRUE, maxdf = NULL, ...){
   
   n <- nrow(tData)
   ind_response <- which(colnames(tData) == Response)
@@ -505,14 +508,14 @@ BuildGasp <- function(Response, tData, input = NULL, mean_fn = 'constant', linMo
     em <- RobustGaSP::rgasp(design = tData_input, response = tData_response, trend = as.matrix(X), kernel_type = covariance, nugget.est = nugget, ...)
   }
 
-  else if (mean_fn == 'lm'){
-    # In case linear model wasn't fitted with exact same data:
-    tt <- stats::terms(linModel)
-    tt <- stats::delete.response(tt)
-    mm <- stats::model.frame(tt, tData_input)
-    X <- stats::model.matrix(tt, mm)
-    em <- RobustGaSP::rgasp(design = tData_input, response = tData_response, trend = as.matrix(X), kernel_type = covariance, nugget.est = nugget, ...)
-  }
+  # else if (mean_fn == 'lm'){
+  #   # In case linear model wasn't fitted with exact same data:
+  #   tt <- stats::terms(linModel)
+  #   tt <- stats::delete.response(tt)
+  #   mm <- stats::model.frame(tt, tData_input)
+  #   X <- stats::model.matrix(tt, mm)
+  #   em <- RobustGaSP::rgasp(design = tData_input, response = tData_response, trend = as.matrix(X), kernel_type = covariance, nugget.est = nugget, ...)
+  # }
   
   # Other option is to provide a specific formula
   else {
@@ -538,16 +541,22 @@ BuildGasp <- function(Response, tData, input = NULL, mean_fn = 'constant', linMo
 
 #' Building a single GP emulator using dgpsi
 #' 
+#' Given emulator assumptions and training data, fits an emulator for the selected output using dgpsi::gp.
+#'
+#' @param Response A string indicating which output is being emulated. Must be consistent with a column of tData.
+#' @param tData Data frame containing training data. At the mimimum, requires columns relating to the inputs and the `Response` to be emulated.
+#' @param input Column indices corresponding to emulator inputs. Defaults to `NULL`, in which case all columns prior to that containing `Response` are assumed to be inputs.
+#' @param mean_fn The assumed mean function. The default is `constant`, which estimates a constant mean. If `linear`, fits a model with a linear term in each of the inputs. Alternatively, a specific formula can be provided, as long as all inputs included are present in `tData`.
+#' @param covariance Covariance function. Defaults to `matern5_2`.
+#' @param nugget Logical, whether to estimate a nugget. Defaults to `TRUE`.
+#' @param ... Other options to pass to [dgpsi::gp()].
+#'
+#' @returns \item{em}{The fitted gp emulator.}
+#' \item{method}{Label indicating that the emulator was fitted with dgpsi::gp.}
+#' \item{response}{Name of the emulated output.}
+#' \item{mean_fn}{Which mean function was used.}
+#' \item{train_data}{The subset of the data that was used to fit the emulator. Unlike `tData`, this output contains only the columns relating to the emulator inputs and output.}
 #' 
-#'
-#' @param Response 
-#' @param tData 
-#' @param input 
-#' @param covariance 
-#' @param nugget 
-#' @param ... 
-#'
-#' @returns
 #' @export
 #'
 #' @examples
@@ -600,17 +609,25 @@ BuildGP <- function(Response, tData, input = NULL, mean_fn = 'constant', covaria
 }
 
 
-#' Building a single DGP emulator using dgpsi
+#' Building a single GP emulator using dgpsi
 #' 
+#' Given emulator assumptions and training data, fits an emulator for the selected output using dgpsi::dgp.
+#'
+#' @param Response A string indicating which output is being emulated. Must be consistent with a column of tData.
+#' @param tData Data frame containing training data. At the mimimum, requires columns relating to the inputs and the `Response` to be emulated.
+#' @param input Column indices corresponding to emulator inputs. Defaults to `NULL`, in which case all columns prior to that containing `Response` are assumed to be inputs.
+#' @param mean_fn The assumed mean function. The default is `constant`, which estimates a constant mean. If `linear`, fits a model with a linear term in each of the inputs. Alternatively, a specific formula can be provided, as long as all inputs included are present in `tData`.
+#' @param covariance Covariance function. Defaults to `matern5_2`.
+#' @param nugget Logical, whether to estimate a nugget. Defaults to `TRUE`.
+#' @param vecchia Whether to use the Vecchia approximation. Default is `NULL`, which will automatically apply the approximation if the number of training points is at least 500.
+#' @param ... Other options to pass to [dgpsi::dgp()].
 #' 
-#'
-#' @param Response 
-#' @param tData 
-#' @param input 
-#' @param covariance 
-#' @param ... 
-#'
-#' @returns description
+#' @returns \item{em}{The fitted dgp emulator.}
+#' \item{method}{Label indicating that the emulator was fitted with dgpsi::dgp.}
+#' \item{response}{Name of the emulated output.}
+#' \item{mean_fn}{Which mean function was used.}
+#' \item{train_data}{The subset of the data that was used to fit the emulator. Unlike `tData`, this output contains only the columns relating to the emulator inputs and output.}
+#' 
 #' @export
 #'
 #' @examples
