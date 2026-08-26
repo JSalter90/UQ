@@ -113,6 +113,17 @@ FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, o
     input <- c(1:p1)[-output_inds]
   }
   
+  # If provided as a character vector, convert to indices
+  else if (is.character(input)){
+    input_names <- input
+    input <- match(input_names, colnames(tData))
+    
+    if (any(is.na(input))){
+      missing_input <- input_names[which(is.na(input))]
+      stop(paste('tData is missing the following inputs, please provide or select different inputs:', paste(missing_input, collapse = ', ')))
+    }
+  }
+  
   if (length(input) == 0){
     stop('Please provide a data frame with more columns than those to be emulated')
   }
