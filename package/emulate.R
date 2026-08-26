@@ -68,22 +68,32 @@ FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, o
   }
   
   if (is.null(output_cols) & !is.null(output)){
-    output_cols <- which(colnames(tData) %in% output)
+    output_cols <- match(output, colnames(tData))
+    
+    if (any(is.na(output_cols))){
+      missing_output <- output[which(is.na(output_cols))]
+      stop(paste('tData is missing the following outputs that were chosen to be emulated, please provide or select different outputs:', paste(missing_output, collapse = ', ')))
+    }
   }
   
   if (!is.null(output_cols) & is.null(output)){
     output <- colnames(tData)[output_cols]
+    
+    if (any(is.na(output))){
+      missing_output <- output_cols[which(is.na(output))]
+      stop(paste('tData is missing the following output indices that were chosen to be emulated, please provide or select different outputs:', paste(missing_output, collapse = ', ')))
+    }
   }
   
   n_em <- length(output_cols) # number of emulators to be fitted
   
   # n_em may be empty if provided names are not contained in tData
-  if (n_em < 1){
-    stop('Please provide valid column indices or column names to be emulated')
-  }
+  # if (n_em < 1){
+  #   stop('Please provide valid column indices or column names to be emulated')
+  # }
   
   # Attempt to select columns with too high index
-  if (any(output_cols > p1)){
+  if (any(output_cols > p1) | any(input > p1)){
     stop('At least one provided index is higher than the number of dimensions of tData, please remove')
   }
   
@@ -94,6 +104,12 @@ FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, o
   
   if (length(input) == 0){
     stop('Please provide a data frame with more columns than those to be emulated')
+  }
+  
+  # Check haven't included output column in input set
+  if (any(input %in% output_cols)){
+    duplicated_input <- colnames(tData)[input[which(input %in% output_cols)]]
+    stop(paste('Following columns have been included as both input and output for same emulator, please refine:', paste(duplicated_input, collapse = ', ')))
   }
   
   # Filter down to required inputs and outputs
