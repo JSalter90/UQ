@@ -20,8 +20,8 @@ cols_good <- viridis::viridis(100)[65]
 #' @param tData A data frame containing the training data, with column(s) relating to all inputs and all outputs to be emulated. May also contain a noise column. May be the output of `ProcessData`.
 #' @param method Which method to use for fitting the emulator(s). Defaults to rgasp `RobustGaSP`. Other options hetGP, gp, dgp (both use `dgpsi`).
 #' @param input Column indices corresponding to emulator inputs. Defaults to `NULL`, in which case all columns prior to the first output column are assumed to be inputs.
-#' @param output Column names corresponding to emulator outputs. Defaults to `NULL`, in which case either a column named C1 and all subsequent columns are emulated, or only the final column of `tData` is emulated.
-#' @param output_cols Column indices corresponding to emulator outputs. Defaults to `NULL`, in which case behaves as `output`.
+#' @param output Column names or column indices corresponding to emulator outputs. Defaults to `NULL`, in which case either a column named C1 and all subsequent columns are emulated, or only the final column of `tData` is emulated.
+#' @param output_cols Deprecated, can provide column indices in `output`.
 #' @param covariance Covariance function. Defaults to `matern5_2`.
 #' @param nugget Logical, whether to estimate a nugget. Defaults to `TRUE`.
 #' @param ... arguments for `BuildGasp`, `BuildHet`, `BuildGP` or `BuildDGP`.
@@ -34,6 +34,10 @@ FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, o
   
   n <- nrow(tData)
   p1 <- ncol(tData)
+  
+  # To ensure consistency with previous version:
+  # output <- output_names
+  # output_cols <- output_inds
   
   # If provided both output and output_cols, check these are consistent
   if (!(is.null(output)) & !(is.null(output_cols))){
@@ -52,68 +56,80 @@ FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, o
     }
   }
   
+  # To handle previous version, map input provided by output_cols to output
+  if (!(is.null(output_cols))){
+    output <- output_cols
+  }
+
   # If nothing specific provided, first search for column named C1, and emulate this and all subsequent columns
-  if (is.null(output_cols) & is.null(output)){
+  if (is.null(output)){
     c1_ind <- which(colnames(tData) == 'C1')
     if (length(c1_ind) > 0){
-      output_cols <- c1_ind:p1
-      output <- colnames(tData)[output_cols]
+      output_inds <- c1_ind:p1
+      output_names <- colnames(tData)[output_inds]
     }
     
     # Otherwise select final column of tData to train emulator
     else {
-      output_cols <- p1
-      output <- colnames(tData)[output_cols]
+      output_inds <- p1
+      output_names <- colnames(tData)[output_inds]
     }
   }
   
-  if (is.null(output_cols) & !is.null(output)){
-    output_cols <- match(output, colnames(tData))
+  # output might be specified as a numeric or character vector, match up to names/indices in tData and check exist
+  else if (is.numeric(output)){
+    output_inds <- output
+    output_names <- colnames(tData)[output_inds]
     
-    if (any(is.na(output_cols))){
-      missing_output <- output[which(is.na(output_cols))]
-      stop(paste('tData is missing the following outputs that were chosen to be emulated, please provide or select different outputs:', paste(missing_output, collapse = ', ')))
-    }
-  }
-  
-  if (!is.null(output_cols) & is.null(output)){
-    output <- colnames(tData)[output_cols]
-    
-    if (any(is.na(output))){
-      missing_output <- output_cols[which(is.na(output))]
+    if (any(is.na(output_names))){
+      missing_output <- output_inds[which(is.na(output_names))]
       stop(paste('tData is missing the following output indices that were chosen to be emulated, please provide or select different outputs:', paste(missing_output, collapse = ', ')))
     }
   }
   
-  n_em <- length(output_cols) # number of emulators to be fitted
+  else if (is.character(output)){
+    output_names <- output
+    output_inds <- match(output_names, colnames(tData))
+    
+    if (any(is.na(output_inds))){
+      missing_output <- output[which(is.na(output_inds))]
+      stop(paste('tData is missing the following outputs that were chosen to be emulated, please provide or select different outputs:', paste(missing_output, collapse = ', ')))
+    }
+  }
+  
+  else {
+    stop('Format of outputs not recognised, please provide either a numeric or character vector relating to columns of tData.')
+  }
+
+  n_em <- length(output_inds) # number of emulators to be fitted
   
   # n_em may be empty if provided names are not contained in tData
   # if (n_em < 1){
   #   stop('Please provide valid column indices or column names to be emulated')
   # }
   
-  # Attempt to select columns with too high index
-  if (any(output_cols > p1) | any(input > p1)){
-    stop('At least one provided index is higher than the number of dimensions of tData, please remove')
-  }
-  
   # If nothing specific provided, set inputs as all but emulated columns
   if (is.null(input)){
-    input <- c(1:p1)[-output_cols]
+    input <- c(1:p1)[-output_inds]
   }
   
   if (length(input) == 0){
     stop('Please provide a data frame with more columns than those to be emulated')
   }
   
+  # Attempt to select columns with too high index
+  if (any(output_inds > p1) | any(input > p1)){
+    stop('At least one provided index is higher than the number of columns of tData, please remove')
+  }
+
   # Check haven't included output column in input set
-  if (any(input %in% output_cols)){
-    duplicated_input <- colnames(tData)[input[which(input %in% output_cols)]]
+  if (any(input %in% output_inds)){
+    duplicated_input <- colnames(tData)[input[which(input %in% output_inds)]]
     stop(paste('Following columns have been included as both input and output for same emulator, please refine:', paste(duplicated_input, collapse = ', ')))
   }
   
   # Filter down to required inputs and outputs
-  tData <- tData[,c(input, output_cols)]
+  tData <- tData[,c(input, output_inds)]
   
   # Relabel
   input <- 1:length(input)
@@ -166,46 +182,46 @@ FitEmulators <- function(tData, method = 'rgasp', input = NULL, output = NULL, o
   # Fit emulator(s)
   if (method %in% c('rgasp', 'gasp', 'Rgasp', 'Gasp')){
     if (n_em == 1){
-      ems <- BuildGasp(Response = output[1], tData = tData, input = input, mean_fn = mean_fn, covariance = covariance, nugget = nugget, ...)
+      ems <- BuildGasp(Response = output_names[1], tData = tData, input = input, mean_fn = mean_fn, covariance = covariance, nugget = nugget, ...)
     }
     
     else {
       ems <- parallel::mclapply(1:n_em, 
-                                function(k) BuildGasp(Response = output[k], tData = tData, input = input, mean_fn = mean_fn[k], covariance = covariance[k], nugget = nugget[k], ...),
+                                function(k) BuildGasp(Response = output_names[k], tData = tData, input = input, mean_fn = mean_fn[k], covariance = covariance[k], nugget = nugget[k], ...),
                                 mc.cores = n_cores)
     }
   }
   
   else if (method %in% c('gp')){
     if (n_em == 1){
-      ems <- BuildGP(Response = output[1], tData = tData, input = input, mean_fn = mean_fn, covariance = covariance, nugget = nugget, ...)
+      ems <- BuildGP(Response = output_names[1], tData = tData, input = input, mean_fn = mean_fn, covariance = covariance, nugget = nugget, ...)
     }
     
     else {
       ems <- lapply(1:n_em, 
-                    function(k) BuildGP(Response = output[k], tData = tData, input = input, mean_fn = mean_fn[k], covariance = covariance[k], nugget = nugget[k], ...))
+                    function(k) BuildGP(Response = output_names[k], tData = tData, input = input, mean_fn = mean_fn[k], covariance = covariance[k], nugget = nugget[k], ...))
     }
   }
   
   else if (method %in% c('dgp', 'dgpsi')){
     if (n_em == 1){
-      ems <- BuildDGP(Response = output[1], tData = tData, input = input, mean_fn = mean_fn, covariance = covariance, nugget = nugget, ...)
+      ems <- BuildDGP(Response = output_names[1], tData = tData, input = input, mean_fn = mean_fn, covariance = covariance, nugget = nugget, ...)
     }
     
     else {
       ems <- lapply(1:n_em, 
-                    function(k) BuildDGP(Response = output[k], tData = tData, input = input, mean_fn = mean_fn[k], covariance = covariance[k], nugget = nugget[k], ...))
+                    function(k) BuildDGP(Response = output_names[k], tData = tData, input = input, mean_fn = mean_fn[k], covariance = covariance[k], nugget = nugget[k], ...))
     }
   }
   
   else if (method %in% c('het', 'Het', 'hetgp', 'hetGP', 'HetGP')){
     if (n_em == 1){
-      ems <- BuildHet(Response = output[1], tData = tData, input = input, mean_fn = mean_fn, covariance = covariance, ...)
+      ems <- BuildHet(Response = output_names[1], tData = tData, input = input, mean_fn = mean_fn, covariance = covariance, ...)
     }
     
     else {
       ems <- parallel::mclapply(1:n_em, 
-                                function(k) BuildHet(Response = output[k], tData = tData, input = input, mean_fn = mean_fn[k], covariance = covariance[k], ...),
+                                function(k) BuildHet(Response = output_names[k], tData = tData, input = input, mean_fn = mean_fn[k], covariance = covariance[k], ...),
                                 mc.cores = n_cores)
     }
   }
