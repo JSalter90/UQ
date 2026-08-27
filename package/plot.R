@@ -8,7 +8,7 @@
 #' @param q 
 #' @param output_inds
 #' 
-#' @return 
+#' @returns description
 #' 
 #'
 #' @importFrom ggplot2 ggplot aes geom_point geom_line geom_errorbar scale_colour_manual labs vars geom_abline theme theme_bw facet_wrap
@@ -112,7 +112,7 @@ PlotBasis <- function(DataBasis, q = 9, output_inds = NULL){
 #' @param data_inds Which (simulation) data to plot. If NULL, plots all contained in `DataBasis`.
 #' @param output_inds Which output locations to plot. If NULL, plots all.
 #' 
-#' @return
+#' @returns description
 #' 
 #' @export
 PlotData <- function(DataBasis, AddMean = TRUE, data_inds = NULL, output_inds = NULL, Obs = NULL, MeanOnly = FALSE){
@@ -273,7 +273,8 @@ PlotData <- function(DataBasis, AddMean = TRUE, data_inds = NULL, output_inds = 
 #' @param input_name 
 #' @param ... 
 #'
-#' @return
+#' @returns 
+#' 
 #' @export
 PlotResid <- function(DataBasis, obs, q, ...){
   
@@ -340,7 +341,7 @@ PlotResid <- function(DataBasis, obs, q, ...){
 #' @param output_name 
 #' @param ... 
 #' 
-#' @return
+#' @returns description
 #' 
 #' @export
 PlotRecon <- function(DataBasis, q = 1, data_inds = 1:16, AddMean = TRUE, residual = FALSE, input_values = NULL, input_name = NULL, output_name = NULL, ...){
@@ -511,8 +512,7 @@ PlotRecon <- function(DataBasis, q = 1, data_inds = 1:16, AddMean = TRUE, residu
 #' @param Obs 
 #' @param ... 
 #' 
-#' @return 
-#' @import ggplot2
+#' @returns
 #' 
 #' @export
 PlotSamples <- function(DataBasis, emulator = NULL, design = NULL, samples = NULL, output_name = NULL, data_inds = NULL, sample_inds = NULL, output_inds = NULL, interval = 0.95, AddMean = TRUE, Obs = NULL,...){
@@ -782,7 +782,7 @@ PlotSamples <- function(DataBasis, emulator = NULL, design = NULL, samples = NUL
 #' @param col 
 #' @param obs 
 #' 
-#' @return 
+#' @returns description
 #' 
 #' @export
 PlotPair <- function(coeffs, x = 'C1', y = 'C2', col = NULL, obs = NULL){
@@ -835,7 +835,7 @@ PlotPair <- function(coeffs, x = 'C1', y = 'C2', col = NULL, obs = NULL){
 #' @param qmax 
 #' @param ... 
 #' 
-#' @return 
+#' @returns description
 #' 
 #' @export
 PlotReconError <- function(DataBasis, obs, qmax = NULL, ...){
@@ -870,7 +870,7 @@ PlotReconError <- function(DataBasis, obs, qmax = NULL, ...){
 #' @param type 
 #' @param ... 
 #' 
-#' @return 
+#' @returns description 
 #' 
 #' @export
 PlotExplained <- function(DataBasis, type = 'cumulative', ...){
@@ -895,3 +895,98 @@ PlotExplained <- function(DataBasis, type = 'cumulative', ...){
   }
   return(plot)
 }
+
+
+
+
+
+
+
+#' Plotting emulator predictions
+#' 
+#' Plots 2D surface of emulator mean and variance across input space
+#'
+#' @param predictions 
+#' @param design If `predictions` is the output of [Predict()], or similarly has only components `$Expectation` and `$Variance`, the corresponding set of inputs is required. Defaults to `NULL`, in which case it searches for a design in `predictions`.
+#' @param inputs Names of inputs to plot on the x and y axis respectively. Defaults to `NULL`, in which case the first two columns of the design are used.
+#' @param output_ind Which column of predictions to use. Defaults to `NULL`, in which case the first output is plotted.
+#' @param plots Which plots to produce. Options are `mean`, `var` and `both` (the default, which plots both the mean and variance).
+#'
+#' @returns Plot of mean and/or variance
+#' @export
+#'
+#' @examples
+PlotPredictions <- function(predictions, design = NULL, inputs = NULL, output_ind = NULL, plots = 'both'){
+  
+  # Check whether predictions is output of HistoryMatch
+  if (!(is.null(predictions$Preds))){
+    design <- predictions$Design
+    predictions <- predictions$Preds
+  }
+  
+  # Otherwise assumes that predictions are output of Predict, and have $Expectation and $Variance
+  if (is.null(predictions$Expectation)){
+    stop('Expected predictions to have component $Expectation or $Preds$Expectation')
+  }
+  
+  if (is.null(predictions$Variance)){
+    stop('Expected predictions to have component $Variance or $Preds$Variance')
+  }
+  
+  if (is.null(inputs)){
+    inputs <- colnames(design)[1:2]
+  }
+  
+  else if (!(length(inputs) == 2)){
+    stop('inputs should contain exactly 2 named inputs')
+  }
+  
+  if (!(all(inputs %in% colnames(design)))){
+    stop('inputs should be contained in design or predictions$Design')
+  }
+  
+  if (is.null(output_ind)){
+    output_ind <- 1
+  }
+  
+  if (output_ind > ncol(predictions$Expectation)){
+    stop('Chosen output index too large. Please select a valid output')
+  }
+  
+  plot_data <- data.frame(design[,inputs], 
+                          Mean = predictions$Expectation[,output_ind], 
+                          Variance = predictions$Variance[,output_ind])
+  colnames(plot_data)[1:2] <- c('x', 'y')
+  
+  if (plots %in% c('both', 'mean')){
+    plot1 <- ggplot(plot_data, aes(x, y, col = Mean)) +
+      geom_point() +
+      scale_colour_viridis_c() +
+      theme_bw() +
+      labs(x = inputs[1], y = inputs[2])
+  }
+  
+  if (plots %in% c('both', 'var')){
+    plot2 <- ggplot(plot_data, aes(x, y, col = Variance)) +
+      geom_point() +
+      scale_colour_viridis_c(option = 'A') +
+      theme_bw() +
+      labs(x = inputs[1], y = inputs[2])
+  }
+  
+  if (plots == 'both'){
+    plot <- cowplot::plot_grid(plot1, plot2)
+  }
+  
+  else if (plots == 'mean'){
+    plot <- plot1
+  }
+  
+  else if (plots == 'var'){
+    plot <- plot2
+  }
+
+  return(plot)
+}
+
+
