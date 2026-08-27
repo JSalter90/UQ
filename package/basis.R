@@ -330,8 +330,9 @@ Recon <- function(coeffs, basis){
     n <- nrow(coeffs)
   }
   
-  #### ADD WARNINGS ####
-  #stopifnot(length(coeffs) == q)
+  if (!(length(coeffs) == q)){
+    stop('Inconsistency between number of coefficients and number of basis vectors')
+  }
   
   if (q == 1 & n == 1){
     recons <- basis*as.numeric(coeffs)
@@ -573,104 +574,6 @@ ExplainT <- function(DataBasis, vtot = 0.95, weightinv = NULL){
 }
 
 
-
-
-# should this directly do prediction?
-
-
-#' Takes mean/variance from set of basis emulators and samples reconstructed fields
-#'
-#' @param BasisPred 
-#' @param DataBasis 
-#' @param ns 
-#' @param AddMean 
-#' @param ReturnAll 
-#' @param BasisUncertainty 
-#' @param ... 
-#' 
-#' @returns description
-#' 
-#' @export
-BasisEmSamples <- function(BasisPred, DataBasis, ns = 100, AddMean = TRUE, ReturnAll = TRUE, BasisUncertainty = TRUE, ...){
-  n <- nrow(BasisPred$Expectation)
-  q <- ncol(BasisPred$Expectation)
-  if (is.null(n)){ # i.e. a single vector has been provided
-    n <- 1
-    q <- length(BasisPred$Expectation) 
-  }
-  
-  ell <- nrow(DataBasis$tBasis)
-  Basis <- DataBasis$tBasis[,1:q]
-  
-  if (AddMean){
-    mu <- DataBasis$EnsembleMean
-  }
-  else {
-    mu <- 0*DataBasis$EnsembleMean
-  }
-  
-  if (BasisUncertainty){
-    BasMinusQ <- DataBasis$tBasis[,-(1:q)] # get deleted vectors
-    DeletedCoeffs <- Project(DataBasis$CentredField, BasMinusQ, ...) # project onto these vectors
-    EstVar <- apply(DeletedCoeffs, 2, stats::var) # variance on these vectors
-    
-    # Want full basis when reconstructing now
-    Basis <- DataBasis$tBasis
-    
-    # Append zero means and these variances to $Expectation, $Variance
-    if (n == 1){
-      BasisPred$Expectation <- c(BasisPred$Expectation, rep(0, ncol(Basis)-q))
-      BasisPred$Variance <- c(BasisPred$Variance, EstVar)
-    }
-    
-    if (n > 1){
-      BasisPred$Expectation <- cbind(BasisPred$Expectation, matrix(0, n, ncol(Basis) - q))
-      BasisPred$Variance <- cbind(BasisPred$Variance, matrix(rep(EstVar, each = n), n, ncol(Basis) - q))
-    }
-    
-    q <- ncol(Basis)
-  }
-  
-  if (n == 1){
-    samp <- matrix(stats::rnorm(q*ns,
-                                mean = rep(BasisPred$Expectation),
-                                sd = rep(sqrt(BasisPred$Variance))), nrow = ns, byrow = TRUE)
-    em_samp <- mu + Basis %*% t(samp)
-  }
-  
-  if (n > 1){
-    em_samp <- array(0, dim = c(ell, ns, n))
-    for (i in 1:n){
-      samp <- matrix(stats::rnorm(q*ns,
-                                  mean = rep(BasisPred$Expectation[i,]),
-                                  sd = rep(sqrt(BasisPred$Variance[i,]))), nrow = ns, byrow = TRUE)
-      em_samp[,,i] <- mu + Basis %*% t(samp)
-    }
-  }
-  
-  if (ReturnAll){
-    return(em_samp)
-  }
-  
-  else {
-    
-    if (n == 1){
-      samp_mean <- apply(em_samp, 1, mean)
-      lower <- apply(em_samp, 1, stats::quantile, probs = 0.025)
-      upper <- apply(em_samp, 1, stats::quantile, probs = 0.975)
-    }
-    
-    if (n > 1){
-      samp_mean <- apply(em_samp, c(1,3), mean)
-      lower <- apply(em_samp, c(1,3), stats::quantile, probs = 0.025)
-      upper <- apply(em_samp, c(1,3), stats::quantile, probs = 0.975)
-    }
-    
-    return(list(mean = samp_mean,
-                lower = lower,
-                upper = upper))
-  }
-}
 
 
 
