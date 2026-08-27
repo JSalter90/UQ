@@ -873,37 +873,6 @@ NewDesign <- function(CandidatePoints, n_new, reps = 100){
               inds = inds_list[[k]]))
 }
 
-
-
-
-#' Include NROY points from previous waves
-#' 
-#' At wave k > 1, add any points from previous waves that are in the current NROY space, and define the new DataBasis object and centred observations by adding these to the new ensemble
-#' 
-#' @param DesignHM output from running PredictAndHM over the old design
-#' @param NewDesign new inputs
-#' @param NewData output corresponding to NewDesign
-#' @param DataBasis object from previous wave
-#' @param Obs centred observation from previous wave
-#' 
-#' @returns \item{Design}{Design with new wave, followed by any NROY runs from previous waves}
-#' \item{DataBasis}{Basis, centred data, and ensemble mean for the new ensemble combined with previous NROY runs}
-#' \item{Obs}{Centred observations, given new ensemble mean} 
-#' 
-#' @export
-# AddPreviousNROY <- function(DesignHM, NewDesign, NewData, DataBasis, Obs, ...){
-#   NROYinds <- which(DesignHM$inNROY == TRUE)
-#   FullDesign <- rbind(NewDesign, DesignHM$Design[NROYinds,])
-#   OldRawData <- DataBasis$CentredField[,NROYinds] + DataBasis$EnsembleMean
-#   RawObs <- Obs + DataBasis$EnsembleMean
-#   AllData <- cbind(NewData, OldRawData)
-#   NewDataBasis <- MakeDataBasis(data = AllData, RemoveMean = TRUE, ...)
-#   NewObs <- RawObs - NewDataBasis$EnsembleMean
-#   return(list(Design = FullDesign, DataBasis = NewDataBasis, Obs = NewObs))
-# }
-
-
-
 #' Plotting NROY space
 #' 
 #' Pairs plots and 1D densities of NROY space
@@ -1015,43 +984,3 @@ PlotNROY <- function(Design, k = NULL, NROY = NULL, Impl = NULL, Truth = NULL){
   }
   return(plot)
 }
-
-
-
-
-
-
-
-
-
-#### NOT EDITED ####
-
-# PlotEmulator <- function(impl, design, variance = FALSE){
-#   thetapred <- unit_to_theta(impl[,c('X1','X2')])
-#   impl$lambda <- thetapred$lambda
-#   impl$C <- thetapred$C
-#   
-#   if (!(is.null(dim(design)))){
-#     design <- unit_to_theta(design)
-#   }
-#   
-#   if (variance){
-#     plot <- ggplot(impl, aes(lambda, C, col = Var)) + 
-#       geom_point() +
-#       geom_point(data = data.frame(C = design$C, lambda = design$lambda), col = 'black', size = 5, shape = 15) +
-#       scale_colour_viridis_c(option = 'H') +
-#       theme_minimal(base_size = 14) +
-#       theme(panel.grid.minor = element_blank(), strip.text = element_text(face = "bold"))
-#   }
-#   
-#   else{
-#     plot <- ggplot(impl, aes(lambda, C, col = Mean)) + 
-#       geom_point() +
-#       geom_point(data = data.frame(C = design$C, lambda = design$lambda), col = 'black', size = 5, shape = 15) +
-#       scale_colour_viridis_c() +
-#       theme_minimal(base_size = 14) +
-#       theme(panel.grid.minor = element_blank(), strip.text = element_text(face = "bold"))
-#   }
-#   
-#   return(plot)
-# }
