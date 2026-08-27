@@ -129,16 +129,32 @@ summary(em_time)
 unlist(lapply(1:4, function(k) em_time[[k]]$response))
 ```
 
-Alternatively, can select the outputs with column indices:
+Alternatively, we can select the outputs with column indices, or the inputs with column names:
 
 ```{r, results='hide'}
-em_time <- FitEmulators(flow1_time[train_inds,], input = 1:4, output_cols = 5:8)
+em_time <- FitEmulators(flow1_time[train_inds,], input = c('kMV','alpha','lrrA','lrrV'), output = 5:8)
 ```
 
 ```{r}
 summary(em_time)
 unlist(lapply(1:4, function(k) em_time[[k]]$response))
 ```
+
+Any combination of `input`, `output` as numeric or character vectors are accepted, so long as any named columns and column indices exist in `tData`. If we try to select a column that doesn't exist:
+
+```{r}
+try(FitEmulators(flow1_time[train_inds,], input = 1:4, output = 'something'))
+```
+
+Selecting the same column as both an input and output is also not acceptable:
+
+```{r}
+try(FitEmulators(flow1_time[train_inds,], input = 1:4, output = 4))
+```
+
+
+Specifying `input` and `output` using column names rather than indices is generally more robust, and will flag if there's a missing name. Selecting using indices will only flag an issue if one or more is out-of-bounds, or if any are present in both the input and output set, but relies on the ordering of the training data being as expected.
+
 
 
 
@@ -189,7 +205,7 @@ val_time[[1]]$input
 
 ## Refitting a specific emulator
 
-By default, the same assumptions are used (currently) for each emulator fitted by a single call of `FitEmulator`. The same assumptions may not be be suitable across all outputs. Above, the out-of-sample predictions for `t150` aren't ideal (outside 95\% prediction intervals for 6 of the 25 points), so we may want to refit this with a different method.
+By default, the same assumptions are used for each emulator fitted by a single call of `FitEmulator`, which may not be desirable across all outputs we provide. Above, the out-of-sample predictions for `t150` aren't ideal (outside 95\% prediction intervals for 6 of the 25 points), so we may want to refit this with a different method.
 
 We can replace the existing emulator for `t150` with a version refitted with different assumptions via:
 
@@ -227,62 +243,110 @@ And can then combine these into a single list to enable us to use the plotting f
 # val_C1 <- Validate(emC1, flow1_coeffs[val_inds,], by_index = TRUE)
 ```
 
+It is not currently possible to fit emulators using multiple different packages in a single call of `FitEmulators`, and the above multiple calls and post-processing are required if we wish to do so. However, given a certain fitting method, we can specify different mean and covariance functions, nuggets, and active input sets for each output (see below).
+
+Generally, it makes sense to use the same fitting method for all outputs initially, before refining any that need it later, via `RefitEmulator`. Prediction, validation etc. all work in the usual way, regardless of whether each individual emulator has been fitted with a different method.
 
 
-## Different input sets
 
-We could instead use different sets of inputs (more useful if emulating different outputs where there are different active sets of inputs, but as an illustration just done for `C1`):
 
-```{r, results='hide'}
-emC1_v1 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 4, output = 'C1')
-emC1_v2 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 3:4, output = 'C1')
-emC1_v3 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 2:4, output = 'C1')
-emC1_v4 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 1:4, output = 'C1')
-```
 
+## NEW - providing different assumptions
+
+Now it's possible to provide different assumptions about the covariance function, nugget, input set, and mean function.
+
+The functionality is that if we provide a vector of $k$ outputs to be emulated, we need to provide either:
+
+  * A single choice of mean, covariance and nugget assumptions, and a single set of inputs, which are then used to fit each emulator
+  
+  * A vector of length $k$ of mean and/or covariance and/or nugget assumptions, and a list of $k$ input sets.
+  
+All combinations of the above are possible. We could choose a specific covariance function for each of the $k$ emulators, but set `nugget = TRUE` to universally assume this, and use the same set of inputs.
+
+
+### Different input sets
+
+To use different sets of input parameters across outputs, we can provide a list that contains either a character or numeric vector relating to the columns of the training dataset, relating to each chosen output.
+
+This may be useful because we're emulating different outputs where there are different active sets of inputs, or perhaps we wish to compare different assumptions for emulating the same output. I'll do the latter here, and fit a constant mean emulator to `C1` with different sets of inputs included.
+
+If we provide a list of input sets, but just a single output, this gives an error as 4 input sets have been provided, but only 1 output (if this were the other way around, with 4 outputs and a single input set, as above this will assume each output has the same set of inputs, and will work fine. The general behaviour is to duplicate input assumptions where needed, but not to automatically duplicate outputs):
 
 ```{r}
-emC1 <- list(emC1_v1, emC1_v2, emC1_v3, emC1_v4)
+inputs <- colnames(scaled_design)
+try(FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = list(inputs[4],inputs[3:4],inputs[2:4],inputs), output = 'C1'))
+```
+
+Instead, explicitly repeating the same output 4 times means that each input set (and any other combination of assumptions we provide) will be used to emulate `C1` each time:
+
+```{r}
+emC1 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = list(inputs[4],inputs[3:4],inputs[2:4],inputs), output = rep('C1',4))
+```
+
+```{r}
 val_C1 <- Validate(emC1, flow1_coeffs[val_inds,], by_index = TRUE)
 ```
 
 Training an emulator using only the 4th input is not particularly useful, and using the 3rd and 4th only doesn't do much better.
 
 
-## Different covariance functions
+### Different covariance functions
 
-A few covariance functions are currently possible (Matern 3/2, Matern 5/2, squared exponential). The default is currently Matern 5/2. Each underlying package names the covariance functions differently (below, written as `rgasp` accepts them), however `FitEmulators` accepts a range of naming conventions and converts them appropriately (see source code / help file for exhaustive list):
+A few covariance functions are currently possible (Matern 3/2, Matern 5/2, squared exponential), with the default currently Matern 5/2. Each underlying package names the covariance functions differently (below, written as `rgasp` accepts them), however `FitEmulators` accepts a range of naming conventions and converts them appropriately (see source code / help file for exhaustive list).
 
-```{r, results='hide'}
-emC1_v1 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 1:4, covariance = 'matern5_2', output = 'C1')
-emC1_v2 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 1:4, covariance = 'matern3_2', output = 'C1')
-emC1_v3 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 1:4, covariance = 'sexp', output = 'C1')
-```
+Here emulating `C1` with each of the 3 covariance functions, keeping all other assumptions the same:
 
 ```{r}
-emC1 <- list(emC1_v1, emC1_v2, emC1_v3)
+emC1 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = inputs, covariance = c('matern5_2', 'matern3_2', 'sexp'), output = rep('C1', 3))
 val_C1 <- Validate(emC1, flow1_coeffs[val_inds,], by_index = TRUE)
 ```
 
-## With/without nugget
+### With/without nugget
 
 Could also compare fitting the emulator with and without a nugget term. The default is to include one:
 
-```{r, results='hide'}
-emC1_v1 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 1:4, output = 'C1', nugget = TRUE)
-emC1_v2 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = 1:4, output = 'C1', nugget = FALSE)
-```
-
-
 ```{r}
-emC1 <- list(emC1_v1, emC1_v2)
+emC1 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = inputs, nugget = c(TRUE,FALSE), output = rep('C1',2))
 val_C1 <- Validate(emC1, flow1_coeffs[val_inds,], by_index = TRUE)
 ```
 
 
 
+## NEW - editing mean functions
 
+Mean functions can be provided in a similar way. The possible options are:
 
+  * `constant`: assumes a constant mean;
+  
+  * `linear`: assumes a mean that is linear in the inputs;
+  
+  * `formula`: any other formula can be given, provided each of the inputs included in it are named in the training data frame. Any formula that can be provided to `lm` can be used here. The response and `~` should not be included.
 
+Training an emulator to `C1` with 4 different mean function arguments. The 2nd and 3rd are identical as an illustration:
 
+```{r}
+mean_fn_vector <- c('constant',
+                  'linear',
+                  'lrrV+kMV+alpha+lrrA',
+                  'I(kMV^2) + I(alpha^2)')
 
+emC1 <- FitEmulators(flow1_coeffs[train_inds,], method = 'rgasp', input = inputs, output = rep('C1',4), mean_fn = mean_fn_vector)
+val_C1 <- Validate(emC1, flow1_coeffs[val_inds,], by_index = TRUE)
+loo_C1 <- LeaveOneOut(emC1, by_index = TRUE)
+```
+
+Should get identical predictions for the 2nd and 3rd:
+
+```{r}
+preds <- Predict(emC1, flow1_coeffs[val_inds,])
+head(preds$Expectation)
+head(preds$Variance)
+```
+
+Should also get identical predictions if re-order columns of test data:
+
+```{r}
+preds2 <- Predict(emC1, flow1_coeffs[val_inds,9:1])
+summary(c(preds$Expectation - preds2$Expectation))
+summary(c(preds$Variance - preds2$Variance))
+```
