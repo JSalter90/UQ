@@ -1009,15 +1009,15 @@ PredictDGP <- function(emulator, design){
 #' @param emulator A single emulator, or a list of emulators.
 #' @param valData Data frame of input vectors and true simulator output corresponding to each output in `emulator`. Set of input vectors used to evaluate the emulators, and plot the emulator predictions vs the truth.
 #' @param interval Prediction interval to plot as error bars. Defaults to 0.95, can be in (0,1).
-#' @param by_input 
-#' @param by_index Whether the x axis should be the emulator prediction (`FALSE`, the default) or the training point index.
+#' @param by_index Whether the x axis should be the true simulator output (`FALSE`, the default) or the training point index.
+#' @param by_input Whether to additionally produce plots with each input in turn on the x axis. Defaults to `FALSE`.
 #' @param Obs If provided, adds horizontal and/or vertical dashed lines to show the location of the observation(s) relative to the emulator predictions. Defaults to `NULL`.
 #'
 #' @returns
 #' @export
 #'
 #' @examples
-Validate <- function(emulator, valData, interval = 0.95, by_input = FALSE, by_index = FALSE, Obs = NULL){
+Validate <- function(emulator, valData, interval = 0.95, by_index = FALSE, by_input = FALSE, Obs = NULL){
   
   if (interval <= 0 | interval >= 1){
     stop('interval must be between 0 and 1')
@@ -1033,12 +1033,12 @@ Validate <- function(emulator, valData, interval = 0.95, by_input = FALSE, by_in
   }
   
   if (n_em == 1){
-    plot <- ValidateSingle(emulator, valData, interval, by_input, by_index, Obs = Obs)
+    plot <- ValidateSingle(emulator, valData, interval = interval, by_index = by_index, by_input = by_input, Obs = Obs)
   }
   
   else {
     plot <- parallel::mclapply(1:n_em, 
-                               function(k) ValidateSingle(emulator[[k]], valData, interval, by_input, by_index, Obs = Obs),
+                               function(k) ValidateSingle(emulator[[k]], valData, interval = interval, by_index = by_index, by_input = by_input, Obs = Obs),
                                 mc.cores = n_cores)
   }
   
@@ -1061,12 +1061,15 @@ Validate <- function(emulator, valData, interval = 0.95, by_input = FALSE, by_in
 #' 
 #' @param emulator either a single output from BuildGasp, or a list of emulators
 #' @param valData a validation data frame containing inputs and true output
-#' @param IndivPars Create plots for each input
+#' @param interval Prediction interval to plot as error bars. Defaults to 0.95, can be in (0,1).
+#' @param by_index Whether the x axis should be the true simulator output (`FALSE`, the default) or the training point index.
+#' @param by_input Whether to additionally produce plots with each input in turn on the x axis. Defaults to `FALSE`.
+#' @param Obs If provided, adds horizontal and/or vertical dashed lines to show the location of the observation(s) relative to the emulator predictions. Defaults to `NULL`.
 #'
-#' @returns an object containing the mean, variance (with nugget removed), and nugget variance, at each input location
+#' @returns Plot(s).
 #' 
 #' @export
-ValidateSingle <- function(emulator, valData, interval = 0.95, by_input = FALSE, by_index = FALSE, Obs = NULL){
+ValidateSingle <- function(emulator, valData, interval = 0.95, by_index = FALSE, by_input = FALSE, Obs = NULL){
   
   if (interval <= 0 | interval >= 1){
     stop('interval must be between 0 and 1')
@@ -1143,7 +1146,7 @@ ValidateSingle <- function(emulator, valData, interval = 0.95, by_input = FALSE,
       geom_point() +
       scale_colour_manual(values = c(cols[2:3])) +
       geom_abline(slope = 1, alpha = 0.6) +
-      labs(y = 'Prediction', x = 'Truth', title = paste0('Outside ', 100*diff(interval), '% = ', perc_outside, '%')) +
+      labs(y = 'Prediction', x = 'True Output', title = paste0('Outside ', 100*diff(interval), '% = ', perc_outside, '%')) +
       theme_bw() +
       theme(legend.position = 'none')
     
@@ -1154,7 +1157,7 @@ ValidateSingle <- function(emulator, valData, interval = 0.95, by_input = FALSE,
     }
   }
 
-  if (by_input == TRUE){
+  if (by_input){
     plot_data <- data.frame(design, as.data.frame(preds))
     plot_data$ind <- NULL
     plot_data <- reshape2::melt(plot_data, id.vars = c('mean', 'lower', 'upper', 'truth', 'In95'))
@@ -1195,14 +1198,15 @@ ValidateSingle <- function(emulator, valData, interval = 0.95, by_input = FALSE,
 #'
 #' @param emulator A single emulator, or a list of emulators.
 #' @param interval Prediction interval to plot as error bars. Defaults to 0.95, can be in (0,1).
+#' @param by_index Whether the x axis should be the true simulator output (`FALSE`, the default) or the training point index.
+#' @param by_input Whether to additionally produce plots with each input in turn on the x axis. Defaults to `FALSE`.
 #' @param Obs If provided, adds horizontal and/or vertical dashed lines to show the location of the observation(s) relative to the emulator predictions. Defaults to `NULL`.
-#' @param by_index Whether the x axis should be the emulator prediction (`FALSE`, the default) or the training point index.
 #'
 #' @returns Leave-one-out plots for each emulator.
 #' @export
 #'
 #' @examples
-LeaveOneOut <- function(emulator, interval = 0.95, Obs = NULL, by_index = FALSE){
+LeaveOneOut <- function(emulator, interval = 0.95, by_index = FALSE, by_input = FALSE, Obs = NULL){
   
   # Find number of emulators
   if (!(is.null(emulator$method))){
@@ -1214,17 +1218,21 @@ LeaveOneOut <- function(emulator, interval = 0.95, Obs = NULL, by_index = FALSE)
   }
   
   if (n_em == 1){
-    plot <- LeaveOneOutSingle(emulator, Obs = Obs, by_index = by_index)
+    plot <- LeaveOneOutSingle(emulator, interval = interval, by_index = by_index, by_input = by_input, Obs = Obs)
   }
   
   else {
     plot <- parallel::mclapply(1:n_em, 
-                               function(k) LeaveOneOutSingle(emulator[[k]], Obs = Obs[k], interval = interval, by_index = by_index),
+                               function(k) LeaveOneOutSingle(emulator[[k]], interval = interval, by_index = by_index, by_input = by_input, Obs = Obs[k]),
                                mc.cores = n_cores)
   }
   
-  if (n_em > 1){
+  if (n_em > 1 & !(by_input)){
     print(cowplot::plot_grid(plotlist = plot))
+  }
+  
+  else if (n_em > 1 & by_input) {
+    print(cowplot::plot_grid(plotlist = lapply(1:n_em, function(k) plot[[k]]$plot)))
   }
 
   return(plot)
@@ -1237,12 +1245,18 @@ LeaveOneOut <- function(emulator, interval = 0.95, Obs = NULL, by_index = FALSE)
 
 #' Leave-one-out
 #' 
-#' @param emulator 
 #' 
-#' @returns description
+#' 
+#' @param emulator A single emulator.
+#' @param interval Prediction interval to plot as error bars. Defaults to 0.95, can be in (0,1).
+#' @param by_index Whether the x axis should be the true simulator output (`FALSE`, the default) or the training point index.
+#' @param by_input Whether to additionally produce plots with each input in turn on the x axis. Defaults to `FALSE`.
+#' @param Obs If provided, adds horizontal and/or vertical dashed lines to show the location of the observation(s) relative to the emulator predictions. Defaults to `NULL`.
+#' 
+#' @returns Leave-one-out plot(s).
 #' 
 #' @export
-LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs = NULL){
+LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, by_input = FALSE, Obs = NULL){
 
   if (interval <= 0 | interval >= 1){
     stop('interval must be between 0 and 1')
@@ -1256,6 +1270,7 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs =
     loo_preds <- RobustGaSP::leave_one_out_rgasp(emulator$em)
     loo_preds$lower <- loo_preds$mean + stats::qnorm(interval[1])*loo_preds$sd
     loo_preds$upper <- loo_preds$mean + stats::qnorm(interval[2])*loo_preds$sd
+    loo_preds$sd <- NULL
   }
   
   if (emulator$method %in% c('gp', 'dgp')){
@@ -1275,6 +1290,7 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs =
     
     loo_preds$lower <- loo_preds$mean + stats::qnorm(interval[1])*loo_preds$std
     loo_preds$upper <- loo_preds$mean + stats::qnorm(interval[2])*loo_preds$std
+    loo_preds$M <- loo_preds$x_train <- loo_preds$y_train <- loo_preds$std <- loo_preds$rmse <- loo_preds$nrmse <- NULL
   }
   
   if (emulator$method == 'het'){
@@ -1294,6 +1310,7 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs =
     
     loo_preds$lower <- loo_preds$mean + stats::qnorm(interval[1])*sqrt(loo_preds$sd2)
     loo_preds$upper <- loo_preds$mean + stats::qnorm(interval[2])*sqrt(loo_preds$sd2)
+    loo_preds$sd2 <- NULL
   }
 
   loo_preds$truth <- response
@@ -1311,7 +1328,7 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs =
   
   if (by_index){
     loo_preds$ind <- 1:length(loo_preds$mean)
-    plot <- ggplot(as.data.frame(loo_preds), aes(x = .data$ind, y = .data$mean)) +
+    plot1 <- ggplot(as.data.frame(loo_preds), aes(x = .data$ind, y = .data$mean)) +
       geom_errorbar(aes(ymin = .data$lower, ymax = .data$upper), col = cols[1]) +
       geom_point(col = cols[1]) +
       geom_point(aes(x = .data$ind, y = .data$truth, col = .data$In95)) +
@@ -1321,28 +1338,54 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs =
       theme(legend.position = 'none')
     
     if (!(is.null(Obs))){
-      plot <- plot + geom_hline(aes(yintercept = as.numeric(Obs)), linetype = 'dashed')
+      plot1 <- plot1 + geom_hline(aes(yintercept = as.numeric(Obs)), linetype = 'dashed')
     }
   }
   
   else {
-    plot <- ggplot(as.data.frame(loo_preds), aes(x = .data$truth, y = .data$mean, col = .data$In95)) +
+    plot1 <- ggplot(as.data.frame(loo_preds), aes(x = .data$truth, y = .data$mean, col = .data$In95)) +
       geom_errorbar(aes(ymin = .data$lower, ymax = .data$upper), col = cols[1]) +
       geom_point() +
       scale_colour_manual(values = c(cols[2:3])) +
       geom_abline(slope = 1, alpha = 0.6) +
-      labs(y = 'Prediction', x = 'Truth', title = paste0('Outside ', 100*diff(interval), '% = ', perc_outside, '%')) +
+      labs(y = 'Prediction', x = 'True Output', title = paste0('Outside ', 100*diff(interval), '% = ', perc_outside, '%')) +
       theme_bw() +
       theme(legend.position = 'none')
     
     if (!(is.null(Obs))){
-      plot <- plot + 
+      plot1 <- plot1 + 
         geom_hline(aes(yintercept = as.numeric(Obs)), linetype = 'dashed') + 
         geom_vline(aes(xintercept = as.numeric(Obs)), linetype = 'dashed')
     }
   }
-
-  return(plot)
+  
+  if (by_input){
+    plot_data <- data.frame(emulator$train_data[,-ncol(emulator$train_data)], as.data.frame(loo_preds))
+    plot_data$ind <- NULL
+    plot_data <- reshape2::melt(plot_data, id.vars = c('mean', 'lower', 'upper', 'truth', 'In95'))
+    plot2 <- ggplot(plot_data, aes(x = .data$value, y = .data$mean)) +
+      geom_errorbar(aes(ymin = .data$lower, ymax = .data$upper), col = cols[1]) +
+      geom_point(col = cols[1]) +
+      geom_point(aes(x = .data$value, y = .data$truth, col = .data$In95)) +
+      facet_wrap(vars(.data$variable), scales = 'free_x') +
+      scale_colour_manual(values = c(cols[2:3])) +
+      labs(y = 'Prediction', x = 'Input', title = paste0('Outside ', 100*diff(interval), '% = ', perc_outside, '%')) +
+      theme_bw() +
+      theme(legend.position = 'none')
+    
+    if (!(is.null(Obs))){
+      plot2 <- plot2 + geom_hline(aes(yintercept = as.numeric(Obs)), linetype = 'dashed')
+    }
+  }
+  
+  if (by_input == FALSE){
+    return(plot1)
+  }
+  
+  else{
+    return(list(plot = plot1,
+                input = plot2))
+  }
 }
 
 
@@ -1352,9 +1395,15 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, Obs =
 #'
 #' For a set of samples, and chosen output indices/locations, compares the emulator expectation and variance for this subset to the true values
 #'
-#' @param Samples A set of samples from the basis emulator, reconstructed to the original field. Usually the output of `BasisEmSamples()`
-#' @param Truth The corresponding true model outputs, for comparison. Must have an ordering of rows and columns consistent with `Samples` (in terms of input and output locations)
+#' @param emulator 
+#' @param design 
+#' @param DataBasis 
+#' @param interval Prediction interval to plot as error bars. Defaults to 0.95, can be in (0,1).
 #' @param output_inds Indices of locations (across the output field) to average over. Defaults to NULL, which uses all outputs
+#' @param data_inds 
+#' @param plot_sum 
+#' @param by_index Whether the x axis should be the true simulator output (`FALSE`, the default) or the training point index.
+#' @param Obs If provided, adds horizontal and/or vertical dashed lines to show the location of the observation(s) relative to the emulator predictions. Defaults to `NULL`.
 #'
 #' @returns Validation plot comparing truth and emulator samples
 #'
@@ -1463,7 +1512,7 @@ ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output
       geom_point() +
       scale_colour_manual(values = c(cols[2:3])) +
       ggplot2::geom_abline(slope = 1, alpha = 0.6) +
-      labs(y = 'Prediction', title = paste0('Outside ', 100*diff(interval), '% = ', perc_outside, '%')) +
+      labs(y = 'Prediction', x = 'True Output', title = paste0('Outside ', 100*diff(interval), '% = ', perc_outside, '%')) +
       theme_bw() +
       theme(legend.position = 'none')
     
