@@ -391,7 +391,7 @@ PlotRecon <- function(DataBasis, q = 1, data_inds = 1:16, AddMean = TRUE, residu
     if (!(residual)){
       plot_data <- data.frame(Input = input_values, 
                               Output = c(c(recons) + mu, c(fields) + mu),
-                              Type = rep(c('Recon', 'Truth'), each = ell*length(data_inds)),
+                              Type = rep(c('Recon', 'Simulator'), each = ell*length(data_inds)),
                               Run = rep(data_inds, each = ell))
       
       plot <- ggplot(plot_data, aes(.data$Input, .data$Output, col = .data$Type)) + 
@@ -448,10 +448,7 @@ PlotRecon <- function(DataBasis, q = 1, data_inds = 1:16, AddMean = TRUE, residu
         theme_bw() +
         labs(x = input_names[1], y = input_names[2])
     }
-    
-    
-    
-    
+
   }
   
   else if (length(input_names) == 2 & multi_var){
@@ -459,7 +456,7 @@ PlotRecon <- function(DataBasis, q = 1, data_inds = 1:16, AddMean = TRUE, residu
       plot_data <- data.frame(Input = input_values[,1],
                               Variable = input_values[,2],
                               Output = c(c(recons) + mu, c(fields) + mu),
-                              Type = rep(c('Recon', 'Truth'), each = ell*length(data_inds)),
+                              Type = rep(c('Recon', 'Simulator'), each = ell*length(data_inds)),
                               Run = rep(data_inds, each = ell))
       
       plot <- ggplot(plot_data, aes(.data$Input, .data$Output, col = .data$Type)) + 
@@ -499,13 +496,13 @@ PlotRecon <- function(DataBasis, q = 1, data_inds = 1:16, AddMean = TRUE, residu
 #'
 #' Takes samples (or a summary of these) from BasisEmSamples and plots, adds the truth if this is provided
 #'
-#' @param output_name 
-#' @param sample_inds Only plot a subset of the provided samples. Still uses all samples to calculate mean/95%.
 #' @param DataBasis 
 #' @param emulator 
 #' @param design 
 #' @param samples 
-#' @param data_inds 
+#' @param output_name 
+#' @param sample_inds Only plot a subset of the provided samples. Still uses all samples to calculate mean/95%.
+#' @param data_inds If provided, plots the true simulator output over the emulator samples. The indices should be ordered in the same way as in `design` or `samples`, and correspond to simulations contained in `DataBasis`.
 #' @param output_inds 
 #' @param interval 
 #' @param AddMean 
@@ -517,26 +514,15 @@ PlotRecon <- function(DataBasis, q = 1, data_inds = 1:16, AddMean = TRUE, residu
 #' @export
 PlotSamples <- function(DataBasis, emulator = NULL, design = NULL, samples = NULL, output_name = NULL, data_inds = NULL, sample_inds = NULL, output_inds = NULL, interval = 0.95, AddMean = TRUE, Obs = NULL,...){
 
-  # Various combinations of design, samples, emulator can be provided
-  if (!(is.null(design)) & is.null(samples) & !(is.null(data_inds))){  
-    # Generate emulator predictions at required locations only
-    preds <- Predict(emulator, design[data_inds,])
-    # Draw samples
-    Samples <- BasisEmSamples(preds, DataBasis, AddMean = AddMean, ...)
-  }
-  
-  else if (is.null(design) & is.null(samples)){
-    stop('Must provide either a design and emulators for prediction, or a set of samples')
-  }
-  
-  # If data_inds not provided, use all of design
-  else if (is.null(samples) & is.null(data_inds)){
-    preds <- Predict(emulator, design)
-    Samples <- BasisEmSamples(preds, DataBasis, AddMean = AddMean, ...)
-  }
-  
-  else if (is.null(design) & !(is.null(samples))){
-    Samples <- samples
+  # If samples not provided, check have both an emulator and design
+  if (is.null(samples)){
+    if (is.null(emulator)){
+      stop('Must provide both an emulator and design for prediction, or a set of samples')
+    }
+    
+    if (is.null(design)){
+      stop('Must provide both an emulator and design for prediction, or a set of samples')
+    }
   }
   
   if (interval <= 0 | interval >= 1){
@@ -544,27 +530,35 @@ PlotSamples <- function(DataBasis, emulator = NULL, design = NULL, samples = NUL
   }
   
   interval <- c((1-interval)/2, 1 - (1-interval)/2)
+  
+  # If samples not provided, create
+  if (is.null(samples)){
+    samples <- BasisEmSamples(DataBasis, emulator = emulator, design = design, AddMean = AddMean, ...)
+  }
+  
+  ell <- nrow(DataBasis$tBasis) # dimension of field
+  ns <- dim(samples)[2] # number of samples
+  n <- ifelse(is.na(dim(samples)[3]), 1, dim(samples)[3]) # number of input locations
 
-  # Construct truth
+  # Construct true output if given indices
   if (!(is.null(data_inds))){
+    # Check that same number of indices provided as contained in samples or design
+    if (!(length(data_inds) == n)){
+      stop('Inconsistency between number of inputs in design or samples, and number of true indices provided in data_inds')
+    }
+
     if (AddMean){
       Truth <- DataBasis$CentredField[,data_inds] + DataBasis$EnsembleMean
     }
     else {
       Truth <- DataBasis$CentredField[,data_inds]
     }
-    
-    inds <- data_inds
   }
   
   else {
-    tmp <- ifelse(is.na(dim(Samples)[3]), 1, dim(Samples)[3])
-    inds <- 1:tmp
+    data_inds <- 1:n
     Truth <- NULL
   }
-
-  ell <- nrow(DataBasis$tBasis) # Dimension of field
-  ns <- dim(Samples)[2] # number of samples
 
   # If don't provide a subset to plot, use all
   if (is.null(output_inds)){
@@ -591,21 +585,18 @@ PlotSamples <- function(DataBasis, emulator = NULL, design = NULL, samples = NUL
   if (is.null(output_name)){
     output_name <- 'Output'
   }
-  
-  # Number of input locations
-  n <- length(inds)
 
   # If have multiple inputs and a set of locations was provided
-  if (length(inds) > 1 & !(is.null(output_inds))){
-    Samples <- Samples[output_inds,,]
+  if (n > 1 & !(is.null(output_inds))){
+    samples <- samples[output_inds,,]
     if (!(is.null(Truth))){
       Truth <- Truth[output_inds,]
     }
   }
   
   # If have a single input
-  if (length(inds) == 1 & !(is.null(output_inds))){
-    Samples <- Samples[output_inds,]
+  if (n == 1 & !(is.null(output_inds))){
+    samples <- samples[output_inds,]
     if (!(is.null(Truth))){
       Truth <- Truth[output_inds]
     }
@@ -621,37 +612,14 @@ PlotSamples <- function(DataBasis, emulator = NULL, design = NULL, samples = NUL
     Obs <- Obs[output_inds]
   }
   
-  
   # Flag for whether the 2nd dimension relates to grid values or multiple variables
   if (length(input_names) > 1){
     multi_var <- ifelse(length(unique(DataBasis$grid[,2])) < 10, TRUE, FALSE)
   }
   
   if (length(input_names) == 1){
-    plot_data <- data.frame(Input = input_values,
-                            Output = c(Samples), 
-                            s = rep(1:ns, each = length(output_inds)),
-                            Run = rep(inds, each = length(output_inds)*ns),
-                            Type = 'Samples')
+    plot_data <- ProcessSamples(samples, input_values, input_names, multi_var = FALSE, output_inds, ns, data_inds, interval, sample_inds)
     
-    # Calculate summaries using all samples
-    plot_data_summary <- rbind(data.frame(stats::aggregate(Output ~ Input + Run, plot_data, mean), Type = 'Mean'),
-                               data.frame(stats::aggregate(Output ~ Input + Run, plot_data, stats::quantile, probs = interval[1]), Type = 'Lower'),
-                               data.frame(stats::aggregate(Output ~ Input + Run, plot_data, stats::quantile, probs = interval[2]), Type = 'Upper'))
-    
-    plot_data_summary$s <- max(plot_data$s)+1
-    plot_data_summary$s[which(plot_data_summary$Type == 'Lower')] <- max(plot_data$s)+2 # to allow to set different linetype
-    plot_data_summary$s[which(plot_data_summary$Type == 'Upper')] <- max(plot_data$s)+3 # to allow to set different linetype
-    plot_data_summary$Type[which(plot_data_summary$Type %in% c('Lower','Upper'))] <- paste0(100*diff(interval), '%')
-    plot_data_summary <- plot_data_summary[,colnames(plot_data)]
-    
-    # Filter out unneeded samples
-    plot_data <- subset(plot_data, s %in% sample_inds)
-    
-    # Combine summaries with samples
-    plot_data <- rbind(plot_data, plot_data_summary)
-    plot_data$Type <- factor(plot_data$Type, levels = c('Samples', 'Mean', paste0(100*diff(interval), '%')))
-
     plot <- ggplot(plot_data, aes(.data$Input, .data$Output, linetype = .data$Type, linewidth = as.factor(.data$s), col = .data$Type)) + 
       geom_line() +
       scale_linetype_manual(values = c(1, 1, 2)) +
@@ -661,7 +629,7 @@ PlotSamples <- function(DataBasis, emulator = NULL, design = NULL, samples = NUL
       labs(x = input_names[1], y = output_name, col = '', linetype = '')
     
     # If plotting multiple runs, facet by run
-    if (length(inds) > 1){
+    if (n > 1){
       plot <- plot + facet_wrap(vars(.data$Run))
     }
     
@@ -670,8 +638,8 @@ PlotSamples <- function(DataBasis, emulator = NULL, design = NULL, samples = NUL
       truth_data <- data.frame(Input = input_values, 
                                Output = c(Truth), 
                                s = max(plot_data$s)-2,
-                               Run = rep(inds, each = length(output_inds)),
-                               Type = 'Truth')
+                               Run = rep(data_inds, each = length(output_inds)),
+                               Type = 'Simulator')
 
       plot <- plot +
         geom_line(data = truth_data) +
@@ -684,9 +652,22 @@ PlotSamples <- function(DataBasis, emulator = NULL, design = NULL, samples = NUL
       obs_data <- data.frame(Input = input_values[,1], 
                              Output = c(Obs), 
                              s = max(plot_data$s)-2,
-                             Run = rep(inds, each = length(output_inds)),
+                             Run = rep(data_inds, each = length(output_inds)),
                              Type = 'Observation')
-      plot <- plot + geom_line(data = obs_data, aes(x = .data$Input, y = .data$Output), col = cols_validate[3], size = 1.5)
+      plot <- plot + 
+        geom_line(data = obs_data, aes(x = .data$Input, y = .data$Output))
+      
+      if (is.null(Truth)){
+        plot <- plot +
+          scale_linetype_manual(values = c(1, 1, 2, 1)) +
+          scale_colour_manual(values = c('grey', 'darkred', 'darkred', cols_validate[2]))
+      }
+      
+      else {
+        plot <- plot +
+          scale_linetype_manual(values = c(1, 1, 2, 1, 1)) +
+          scale_colour_manual(values = c('grey', 'darkred', 'darkred', cols_good, cols_validate[2]))
+      }
     }
   }
   
@@ -696,30 +677,8 @@ PlotSamples <- function(DataBasis, emulator = NULL, design = NULL, samples = NUL
   }
   
   else if (length(input_names) == 2 & multi_var){
-    plot_data <- data.frame(Input = input_values[,1],
-                            Variable = input_values[,2],
-                            Output = c(Samples), 
-                            s = rep(1:ns, each = length(output_inds)),
-                            Run = rep(inds, each = length(output_inds)*ns),
-                            Type = 'Samples')
-    
-    plot_data_summary <- rbind(data.frame(stats::aggregate(Output ~ Input + Variable + Run, plot_data, mean), Type = 'Mean'),
-                               data.frame(stats::aggregate(Output ~ Input + Variable + Run, plot_data, stats::quantile, probs = interval[1]), Type = 'Lower'),
-                               data.frame(stats::aggregate(Output ~ Input + Variable + Run, plot_data, stats::quantile, probs = interval[2]), Type = 'Upper'))
-    
-    plot_data_summary$s <- max(plot_data$s)+1
-    plot_data_summary$s[which(plot_data_summary$Type == 'Lower')] <- max(plot_data$s)+2 # to allow to set different linetype
-    plot_data_summary$s[which(plot_data_summary$Type == 'Upper')] <- max(plot_data$s)+3 # to allow to set different linetype
-    plot_data_summary$Type[which(plot_data_summary$Type %in% c('Lower','Upper'))] <- paste0(100*diff(interval), '%')
-    plot_data_summary <- plot_data_summary[,colnames(plot_data)]
-    
-    # Filter out unneeded samples
-    plot_data <- subset(plot_data, s %in% sample_inds)
-    
-    # Combine summaries with samples
-    plot_data <- rbind(plot_data, plot_data_summary)
-    plot_data$Type <- factor(plot_data$Type, levels = c('Samples', 'Mean', paste0(100*diff(interval), '%')))
-    
+    plot_data <- ProcessSamples(samples, input_values, input_names, multi_var, output_inds, ns, data_inds, interval, sample_inds)
+
     plot <- ggplot(plot_data, aes(.data$Input, .data$Output, linetype = .data$Type, linewidth = as.factor(.data$s), col = .data$Type)) + 
       geom_line() +
       scale_linetype_manual(values = c(1, 1, 2)) +
@@ -729,7 +688,7 @@ PlotSamples <- function(DataBasis, emulator = NULL, design = NULL, samples = NUL
       labs(x = input_names[1], y = output_name, col = '', linetype = '')
     
     # If plotting multiple runs, facet by run
-    if (length(inds) > 1){
+    if (n > 1){
       plot <- plot + facet_grid(.data$Variable ~ .data$Run)
     }
     
@@ -743,8 +702,8 @@ PlotSamples <- function(DataBasis, emulator = NULL, design = NULL, samples = NUL
                                Variable = input_values[,2], 
                                Output = c(Truth), 
                                s = max(plot_data$s)-2,
-                               Run = rep(inds, each = length(output_inds)),
-                               Type = 'Truth')
+                               Run = rep(data_inds, each = length(output_inds)),
+                               Type = 'Simulator')
 
       plot <- plot +
         geom_line(data = truth_data) +
@@ -757,17 +716,95 @@ PlotSamples <- function(DataBasis, emulator = NULL, design = NULL, samples = NUL
                              Variable = input_values[,2], 
                              Output = c(Obs), 
                              s = max(plot_data$s)-2,
-                             Run = rep(inds, each = length(output_inds)),
+                             Run = rep(data_inds, each = length(output_inds)),
                              Type = 'Observation')
       
-      plot <- plot + geom_line(data = obs_data, aes(x = .data$Input, y = .data$Output), linetype = 1, col = cols_validate[3], size = 1.5)
+      plot <- plot + 
+        geom_line(data = obs_data)
+      
+      if (is.null(Truth)){
+        plot <- plot +
+          scale_linetype_manual(values = c(1, 1, 2, 1)) +
+          scale_colour_manual(values = c('grey', 'darkred', 'darkred', cols_validate[2]))
+      }
+      
+      else {
+        plot <- plot +
+          scale_linetype_manual(values = c(1, 1, 2, 1, 1)) +
+          scale_colour_manual(values = c('grey', 'darkred', 'darkred', cols_good, cols_validate[2]))
+      }
     }
-    
-    
   }
   
   return(plot)
 }
+
+
+
+
+
+#'
+#'
+#' Function for processing samples and creating plotting object with [PlotSamples()]. Not for general use.
+#'
+ProcessSamples <- function(samples, input_values, input_names, multi_var, output_inds, ns, data_inds, interval, sample_inds){
+  
+  if (length(input_names) == 1){
+    plot_data <- data.frame(Input = input_values,
+                            Output = c(samples), 
+                            s = rep(1:ns, each = length(output_inds)),
+                            Run = rep(data_inds, each = length(output_inds)*ns),
+                            Type = 'Samples')
+    
+    # Calculate summaries using all samples
+    plot_data_summary <- rbind(data.frame(stats::aggregate(Output ~ Input + Run, plot_data, mean), Type = 'Mean'),
+                               data.frame(stats::aggregate(Output ~ Input + Run, plot_data, stats::quantile, probs = interval[1]), Type = 'Lower'),
+                               data.frame(stats::aggregate(Output ~ Input + Run, plot_data, stats::quantile, probs = interval[2]), Type = 'Upper'))
+    
+  }
+
+  if (length(input_names) == 2 & multi_var){
+    plot_data <- data.frame(Input = input_values[,1],
+                            Variable = input_values[,2],
+                            Output = c(samples), 
+                            s = rep(1:ns, each = length(output_inds)),
+                            Run = rep(data_inds, each = length(output_inds)*ns),
+                            Type = 'Samples')
+    
+    plot_data_summary <- rbind(data.frame(stats::aggregate(Output ~ Input + Variable + Run, plot_data, mean), Type = 'Mean'),
+                               data.frame(stats::aggregate(Output ~ Input + Variable + Run, plot_data, stats::quantile, probs = interval[1]), Type = 'Lower'),
+                               data.frame(stats::aggregate(Output ~ Input + Variable + Run, plot_data, stats::quantile, probs = interval[2]), Type = 'Upper'))
+  }
+  
+  plot_data_summary$s <- max(plot_data$s)+1
+  plot_data_summary$s[which(plot_data_summary$Type == 'Lower')] <- max(plot_data$s)+2 # to allow to set different linetype
+  plot_data_summary$s[which(plot_data_summary$Type == 'Upper')] <- max(plot_data$s)+3 # to allow to set different linetype
+  plot_data_summary$Type[which(plot_data_summary$Type %in% c('Lower','Upper'))] <- paste0(100*diff(interval), '%')
+  plot_data_summary <- plot_data_summary[,colnames(plot_data)]
+  
+  # Filter out unneeded samples
+  plot_data <- subset(plot_data, s %in% sample_inds)
+  
+  # Combine summaries with samples
+  plot_data <- rbind(plot_data, plot_data_summary)
+  plot_data$Type <- factor(plot_data$Type, levels = c('Samples', 'Mean', paste0(100*diff(interval), '%')))
+  
+  return(plot_data)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
