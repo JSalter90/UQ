@@ -44,7 +44,7 @@ MakeDataBasis <- function(data, weightinv = NULL, W = NULL, RemoveMean = TRUE, C
       colnames(tCoeffs) <- paste0('C', 1:ncol(tCoeffs))
     }
 
-    if (StoreEigen == TRUE){
+    if (StoreEigen & !(is.null(tSVD$Q))){
       Q <- tSVD$Q
       Lambda <- tSVD$Lambda
       return(list(tBasis = tBasis, CentredField = CentredField, EnsembleMean = EnsembleMean, Coeffs = tCoeffs, Q = Q, Lambda = Lambda))
@@ -75,7 +75,7 @@ MakeDataBasis <- function(data, weightinv = NULL, W = NULL, RemoveMean = TRUE, C
       colnames(tCoeffs) <- paste0('C', 1:ncol(tCoeffs))
     }
     
-    if (StoreEigen == TRUE){
+    if (StoreEigen){
       return(list(tBasis = tBasis, CentredField = CentredField, EnsembleMean = EnsembleMean, Coeffs = tCoeffs, Q = Q, Lambda = Lambda, Winv = Winv))
     }
     else {
@@ -330,7 +330,11 @@ Recon <- function(coeffs, basis){
     n <- nrow(coeffs)
   }
   
-  if (!(length(coeffs) == q)){
+  if (n > 1 & !(ncol(coeffs) == q)){
+    stop('Inconsistency between number of coefficients and number of basis vectors')
+  }
+  
+  else if (n == 1 & !(length(coeffs) == q)){
     stop('Inconsistency between number of coefficients and number of basis vectors')
   }
   
