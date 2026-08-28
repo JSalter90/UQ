@@ -13,10 +13,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, cache = TRU
 ```
 
 
-Disclaimer (5/8/26): this is still WIP, and some functionality may slightly change.
-
-
-
+Updated: 28/8/26, with more streamlined functionality of `PlotSamples`.
 
 Load in design, data:
 
@@ -49,110 +46,166 @@ DataBasis$grid <- data.frame(Time = seq(from=0,by = 0.01, len = 512))
 PlotBasis(DataBasis)
 ```
 
-
-Comparing true output with reconstruction given by $q = 2$ basis vectors (for 1st 4 ensemble members):
+Comparing true simulator output with reconstruction given by $q = 2$ basis vectors, for the first 4 ensemble members):
 
 ```{r, fig.height=4}
-PlotRecon(DataBasis, q = 2, ind = 1:4)
+PlotRecon(DataBasis, q = 2, data_inds = 1:4)
 ```
 
-Looking at some coefficients:
+Plotting pairs of coefficients, potentially coloured by a third:
 
 ```{r}
 PlotPair(DataBasis$Coeffs, col = 'C3')
 ```
 
-More interesting to combine with design and then plot:
+It's more interesting to combine the coefficients with the design, and then plot pairs of inputs coloured by coefficients, to start to assess whether there is any relationship between the inputs and basis coefficients:
 
 ```{r}
 flow1_data <- GetEmData(scaled_design, DataBasis, q = 5)
 PlotPair(flow1_data, x = 'alpha', y = 'lrrV', col = 'C1')
 ```
 
-Emulate:
+E.g., here it looks like in general high values of `alpha` combined with low values of `lrrV` are associated with the highest values of `C1`, and there may be a smooth relationship between the inputs and this coefficient.
+
+Note that each point here has different values of the other input parameters, so the colouring may appear noisy if these have an impact.
+
+Splitting the data into training and validation sets, and fitting an emulator to each of the leading coefficients:
 
 ```{r}
 tt <- TrainTestSplit(scaled_design, seed = 58219)
 train_inds <- tt$train_inds
 val_inds <- tt$val_inds
 
-emCoeffs <- FitEmulators(flow1_data[train_inds,], input = 1:4)
+inputs <- colnames(scaled_design)
+emCoeffs <- FitEmulators(flow1_data[train_inds,], input = inputs)
 ```
 
-We can generate predictions of the coefficients:
+This trains an emulator for each of the coefficients included in `flow1_data`, i.e. 5 independent emulators for:
+
+```{r}
+unlist(lapply(1:length(emCoeffs), function(k) emCoeffs[[k]]$response))
+```
+
+The default assumptions in `FitEmulators` train emulators using `rgasp` with a constant mean, Matern 5/2 covariance and estimated nugget. See `emulate.html` for an extensive demonstration of how to use `FitEmulators`, and options for emulator validation. As it's not the purpose of this vignette, here we'll assume we've checked our emulators and are satisfied they are accurate, hence can proceed to prediction and other tasks.
+
+Evaluating the emulators across a space-filling sample in input parameter space to give predictions (expectation, variance) of the 5 leading coefficients:
 
 ```{r}
 set.seed(58219)
 BigDesign <- lhs::randomLHS(5000,4)
 colnames(BigDesign) <- colnames(scaled_design)
 predsCoeffs <- Predict(emCoeffs, BigDesign)
+summary(predsCoeffs$Expectation)
 ```
 
-But it's more interesting to go from this to predictions on the original field. We'll do so for the validation set so we can compare to the truth, but these can be constructed for any point.
+We can plot the output surface of the emulator (mean, variance) for any pairs of inputs, similarly to how we plotted the training data above. Once again plotting the `C1` as `alpha` and `lrrV` vary, according to the emulator:
 
 ```{r}
+PlotPredictions(predsCoeffs, design = BigDesign, inputs = c('alpha', 'lrrV'), plots = 'mean')
+```
+
+Or for both the mean and variance:
+
+```{r, fig.width=8}
+PlotPredictions(predsCoeffs, design = BigDesign, inputs = c('alpha', 'lrrV'), plots = 'both')
+```
+
+
+Predictions of coefficients can be interesting (and important to validate the emulators on this level), but it might be more informative to go from predictions of coefficients to predictions of the original full field.
+
+We'll construct these predictions for the validation set so that we can compare the emulator predictions at these inputs to the true simulator output, but the same approach works for any point in input space.
+
+Sampled reconstrutions of the full field can be constructed either from a set of predictions on the coefficients:
+
+```{r}
+set.seed(128492)
 predsVal <- Predict(emCoeffs, flow1_data[val_inds,])
-sampsVal <- BasisEmSamples(predsVal, DataBasis)
+sampsVal <- BasisEmSamples(DataBasis, predictions = predsVal)
 dim(sampsVal)
 ```
 
-By default, we have 100 samples for the 512D field for each of the 25 points we provided.
-
-THIS ISN'T REALLY NEEDED, BUT IS WHEN YOU DON'T HAVE THE TRUTH
-
-```{r, fig.height = 5}
-PlotSamples(DataBasis, emCoeffs, scaled_design, data_inds = val_inds[1:4], sample_inds = 1:10)
-```
-
-It looks like the prediction is accurate. Zooming in on a single panel:
+Or by simply providing an emulator and design:
 
 ```{r}
-PlotSamples(DataBasis, emCoeffs, scaled_design, data_inds = val_inds[1], sample_inds = 1:10)
+set.seed(128492)
+sampsVal2 <- BasisEmSamples(DataBasis, emulator = emCoeffs, design = flow1_data[val_inds,])
 ```
 
-Instead imagine we predicted with only the `C1` emulator:
+The 2 are equivalent:
 
 ```{r}
-PlotSamples(DataBasis, emCoeffs[[1]], scaled_design, data_inds = val_inds[1], sample_inds = 1:10)
+summary(c(sampsVal - sampsVal2))
 ```
 
-We now much better see what this plot tells us. We have the truth + emulator mean and 95\% prediction interval, plus a small number (10) of individual samples added in grey.
-
-The code automatically samples from the discarded basis vectors. If we only emulate `C1`, this variance could be quite large. Plotting without this added as an illustration:
+By default, we have 100 samples for the 512D field for each of the 25 points we provided:
 
 ```{r}
-PlotSamples(DataBasis, emCoeffs[[1]], scaled_design, data_inds = val_inds[1], sample_inds = 1:10, BasisUncertainty = FALSE)
+dim(sampsVal2)
 ```
 
-In this case, we have a fairly accurate/low variance emulator for `C1`, but unsurprisingly this doesn't represent the true output very well, and if we ignore the remaining variability our emulator is poor. Adding `C2` to our emulator:
+but can adjust the number of samples via option `ns`.
+
+Plotting samples can similarly be approached by either a) providing a set of samples we've constructed using `BasisEmSamples` or by other means, or b) providing an emulator and design, to function `PlotSamples`. Here, we want to plot the emulator predictions for the 1st 4 validation points, and will plot 10 samples in the background (although all samples are used to calculate the mean and variance):
+
+```{r, fig.height = 5, fig.width=8}
+PlotSamples(DataBasis, emCoeffs, scaled_design[val_inds[1:4],], data_inds = val_inds[1:4], sample_inds = 1:10)
+```
+
+Zooming in on a single panel by providing a single input vector:
 
 ```{r}
-PlotSamples(DataBasis, emCoeffs[1:2], scaled_design, data_inds = val_inds[1], sample_inds = 1:10, BasisUncertainty = FALSE)
+PlotSamples(DataBasis, emCoeffs, scaled_design[val_inds[1],], data_inds = val_inds[1], sample_inds = 1:10)
 ```
 
-We're more accurate, but early on the truth sits outside our predictive uncertainty. But adding in variance due to the discarded vectors resolves this:
+The emulator here is relatively accurate (at least, the variance is small relative to the variability in the output), so it's a bit hard to see what this plot is showing. To better understand this, instead imagine predicting using only the `C1` emulator:
 
 ```{r}
-PlotSamples(DataBasis, emCoeffs[1:2], scaled_design, data_inds = val_inds[1], sample_inds = 1:10, BasisUncertainty = TRUE)
+PlotSamples(DataBasis, emCoeffs[[1]], scaled_design[val_inds[1],], data_inds = val_inds[1], sample_inds = 1:10)
 ```
 
-Of course, here this source of uncertainty doesn't seem large when we emulate the first 5 vectors, but this example is a) relatively low-dimensional and b) can explain an predict vast majority of variability. This won't always be true, and it's important to account for any variability from removed vectors, even if it is random noise.
+We now much better see what this plot tells us. We have the true simulator outout, along with the emulator mean and 95\% prediction interval, plus a small number (10) of individual samples added in grey.
 
-We can also plot the reconstructions without the mean added back in, which might drown out other signal:
-
-```{r, fig.height = 5}
-PlotSamples(DataBasis, emCoeffs, scaled_design, data_inds = val_inds[5:8], sample_inds = 1:10, AddMean = FALSE)
-```
-
-
-
-
-
-
-Rather than validating on the coefficients, we could reconstruct and compare the mean (or some other summary) between the emulator an the truth (although the value is of course on getting predictions for all outputs, but this can be a nice sense check). For the validation set:
+The code automatically samples from the discarded basis vectors, as this is a source of uncertainty that we shouldn't ignore. As an illustration, the below switches this off, and hence our prediction is just the ensemble mean plus our prediction on the leading basis vector:
 
 ```{r}
-ValidateSummary(emCoeffs, scaled_design[,1:4], DataBasis, data_inds = val_inds)
+PlotSamples(DataBasis, emCoeffs[[1]], scaled_design[val_inds[1],], data_inds = val_inds[1], sample_inds = 1:10, BasisUncertainty = FALSE)
 ```
+
+In this case, we have a fairly accurate/low variance emulator for `C1`, but unsurprisingly this doesn't represent the true simulator output very well, and if we ignore the remaining variability our prediction is poor and overconfident. 
+
+Adding `C2` to our emulator:
+
+```{r}
+PlotSamples(DataBasis, emCoeffs[1:2], scaled_design[val_inds[1],], data_inds = val_inds[1], sample_inds = 1:10, BasisUncertainty = FALSE)
+```
+
+We're more accurate, but in a couple of places, particularly early on, the simulator output sits outside the predictive uncertainty. Adding in variance due to the discarded vectors resolves this:
+
+```{r}
+PlotSamples(DataBasis, emCoeffs[1:2], scaled_design[val_inds[1],], data_inds = val_inds[1], sample_inds = 1:10, BasisUncertainty = TRUE)
+```
+
+Of course, here this source of uncertainty doesn't seem large when we included emulators for each of the first 5 vectors, but this example is a) relatively low-dimensional and b) can explain and predict vast majority of variability using a small number of basis vectors. This won't always be true, and it's important to account for any variability from removed vectors, even if it is random noise.
+
+We can also plot the reconstructions without the mean added back in, in case this drowns out interesting signal/patterns:
+
+```{r, fig.height = 5, fig.width=8}
+PlotSamples(DataBasis, emCoeffs, scaled_design[val_inds[5:8],], data_inds = val_inds[5:8], sample_inds = 1:10, AddMean = FALSE)
+```
+
+
+Rather than validating on the coefficients, we could reconstruct and compare the mean (or some other summary) between the emulator and the simulator as a further sense check. For the validation set:
+
+```{r}
+ValidateSummary(emCoeffs, scaled_design[val_inds,], DataBasis, data_inds = val_inds)
+```
+
+
+
+## Multiple 1D profiles
+
+All generalises.
+
+
 
 
