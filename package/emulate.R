@@ -1408,7 +1408,7 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, by_in
 #' @returns Validation plot comparing truth and emulator samples
 #'
 #' @export
-ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output_inds = NULL, data_inds = NULL, plot_sum = FALSE, by_index = FALSE, Obs = NULL){
+ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output_inds = NULL, data_inds = NULL, plot_sum = FALSE, by_index = FALSE, Obs = NULL, ns = 1000){
   
   if (interval <= 0 | interval >= 1){
     stop('interval must be between 0 and 1')
@@ -1420,11 +1420,15 @@ ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output
     data_inds <- 1:nrow(design)
   }
   
+  else if (!(nrow(design) == length(data_inds))) {
+    stop('Mismatch between number of rows of design and number of indices in data_inds')
+  }
+  
   # Predict
-  preds <- Predict(emulator, design[data_inds,])
+  preds <- Predict(emulator, design)
 
   # Draw samples
-  Samples <- BasisEmSamples(DataBasis, predictions = preds, ns = 1000)
+  Samples <- BasisEmSamples(DataBasis, predictions = preds, ns = ns)
   
   # Construct truth
   Truth <- DataBasis$CentredField[,data_inds] + DataBasis$EnsembleMean
