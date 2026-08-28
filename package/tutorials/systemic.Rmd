@@ -30,7 +30,7 @@ library(ggplot2)
 
 Considering the systemic data (7 flow time series, plus max/min pressure, 5 inputs).
 
-Scaling the design to [0,1]:
+Scaling the design to [0,1] using the provided parameter ranges:
 
 ```{r}
 scaled_design <- ScaleInputs(design_sim, parRanges, c(0,1))
@@ -40,7 +40,7 @@ dim(output_flow) <- c(512*7, 1250)
 dim(output_pressure)
 ```
 
-This dataset contains 1250 simulations, with 7 flow outputs each with 512 points, and 2 scalar outputs.
+This dataset contains 1250 simulations, with 7 flow outputs each with 512 points, and 2 scalar outputs relating to the maximum and minimum pressure.
 
 For wave 1, we'll select a subset of 100 points, and then add in others later.
 
@@ -96,9 +96,11 @@ By default, splits into the 7 different outputs, although in reality everything'
 
 First, let's constrain space based on the max and min pressure. Emulating these 2 outputs (using all 100 points as training, and considering LOOs rather than prediction over an out-of-sample set):
 
-```{r}
+```{r, out.width=8}
 data_pressureW1 <- data.frame(designW1, pressureW1)
-em_pressureW1 <- FitEmulators(data_pressureW1, input = 1:5, output = c('max_pressure', 'min_pressure'))
+head(data_pressureW1)
+inputs <- colnames(designW1)
+em_pressureW1 <- FitEmulators(data_pressureW1, input = inputs, output = c('max_pressure', 'min_pressure'))
 looW1 <- LeaveOneOut(em_pressureW1, Obs = obs_pressure, by_index = TRUE)
 ```
 
@@ -180,7 +182,7 @@ Fitting new emulators:
 
 ```{r}
 data_pressureW2 <- data.frame(designW2, pressureW2)
-em_pressureW2 <- FitEmulators(data_pressureW2, input = 1:5, output = c('max_pressure', 'min_pressure'))
+em_pressureW2 <- FitEmulators(data_pressureW2, input = inputs, output = c('max_pressure', 'min_pressure'))
 looW2 <- LeaveOneOut(em_pressureW2, Obs = obs_pressure, by_index = TRUE)
 ```
 
@@ -217,6 +219,52 @@ We've ruled out a bit more, mostly around the edges (lower `fs3`, higher `f3`).
 
 We could keep sampling new points from within NROY and continue to refine the emulators, to see if can reduce space further (not done here as restricting to the 1250 pre-prepared simulations).
 
+
+
+## Adding previous NROY simulations
+
+Before fitting new emulators, we may wish to add in some of the simulations from wave 1. Sometimes adding all of them might give a better emulator, even those that are far from the observations and NROY space, but usually we want to remove those (e.g., the stationary assumption will hopefully be reasonable in the reduced space that we've zoomed in on, but may not be if we include the full parameter space, and result in worse emulation in the regon we actually care about).
+
+In general, we should at least add any simulations from the previous wave that are in NROY: this is definitely useful information about the simulator! Here, there won't be many, if any, given we've ruled out a large percentage of parameter space, and there will likely be little benefit as these outputs are relatively easy to emulate, and we have a reasonable coverage of 5D space. In cases where the input space is higher-dimensional, the simulator is more expensive, or the output harder to emulate, using all (useful) simulations we have available to train emulators is more important.
+
+Let's check whether any of the wave 1 simulations were in the wave 1 NROY space:
+
+```{r}
+hmW1_design <- HistoryMatch(em_pressureW1, designW1, Obs = obs_pressure, ObsVar = c(1/4, 1/4))
+hmW1_design$NROY
+which(hmW1_design$inNROY)
+```
+
+We find that 5\% of them are.
+
+In some cases, keeping points that are close to but just outside NROY space can also help the emulator (in particular, helping to better define the boundaries). Instead of just keeping everything, we could slightly relax the implausibility cutoff, say to 4, so that we keep points that were ruled out, but that are close to NROY:
+
+```{r}
+hmW1_design <- HistoryMatch(em_pressureW1, designW1, Obs = obs_pressure, ObsVar = c(1/4, 1/4), threshold = 4)
+hmW1_design$NROY
+which(hmW1_design$inNROY)
+```
+
+In this case, this keeps no extra runs.
+
+Adding these 5 points to the wave 2 design, and refitting emulators and history matching:
+
+```{r}
+data_pressureW2_added <- rbind(data_pressureW2, data_pressureW1[which(hmW1_design$inNROY),])
+em_pressureW2_added <- FitEmulators(data_pressureW2_added, input = inputs, output = c('max_pressure', 'min_pressure'))
+looW2_added <- LeaveOneOut(em_pressureW2_added, Obs = obs_pressure, by_index = TRUE)
+```
+
+```{r}
+hmW2_added <- HistoryMatch(em_pressureW2_added, Obs = obs_pressure, ObsVar = c(1/4, 1/4), PreviousWave = hmW1)
+hmW2_added$NROY
+hmW2_added$Pass_kth
+```
+
+For this example, since we had high coverage of simulations in NROY space already, the emulators and hence HM results are little changed by the addition of 5 extra runs.
+
+
+
 ## Wave 3: adding flow
 
 Instead, it might turn out that we're restricted things almost as much as is possible based on the pressure: `f2`, `fs2`, and to a lesser extent `fs3`, may not be particularly important for predicting pressure.
@@ -242,7 +290,7 @@ PlotPair(data_flowW2, 'f2', 'fs2', col = 'C1')
 Emulating leading 6 coefficients (arbitrarily; really should also consider next few in case):
 
 ```{r}
-em_flowW2 <- FitEmulators(data_flowW2, input = 1:5)
+em_flowW2 <- FitEmulators(data_flowW2, input = inputs)
 loo_flowW2 <- LeaveOneOut(em_flowW2, by_index = TRUE)
 ```
 
@@ -281,4 +329,53 @@ PlotSamples(DataBasisW2, em_flowW2, design = nroyW3[1:4,], output_inds = which(D
 ```
 
 Generally predictions from emulator look similar to observations - which they mostly should be, given we've ruled out those that don't (up to emulator uncertainty).
+
+
+## Evaluating true implausibility/NROY
+
+As an aside, we could consider what the true NROY space looks like. E.g., use all the simulations of the true model that we have available, and use these to define NROY space. There's no emulation required as the exact output is known, hence emulator variance is zero.
+
+This can be done using the same code as above, but instead of providing emulators, we need to provide the `TrueOutput`. First identifying which inputs lie in the true NROY based on max/min pressure.
+
+If we fail to provide either an emulator or a true output, the code gives an error:
+
+```{r}
+try(hm_pressure_true <- HistoryMatch(design = scaled_design, Obs = obs_pressure, ObsVar = c(1/4, 1/4)))
+```
+
+`TrueOutput` needs to contain columns corresponding to the observations and rows corresponding to the design; here we need to provide a 1250x2 matrix or data frame:
+
+```{r}
+hm_pressure_true <- HistoryMatch(design = scaled_design, Obs = obs_pressure, ObsVar = c(1/4, 1/4), TrueOutput = output_pressure)
+hm_pressure_true$NROY
+hm_pressure_true$Pass_kth
+```
+
+So in fact, with the 2 waves of HM above we'd actually got quite close to this true space already.
+
+Verifying that the identified 5\% of runs do indeed have true output close to the observations:
+
+```{r}
+summary(output_pressure[hm_pressure_true$inNROY,])
+```
+
+Plotting the true NROY space:
+
+```{r, fig.height=5}
+PlotNROY(hm_pressure_true$Design, k = 1:5, Truth = truth)
+```
+
+Instead for flow:
+
+```{r}
+hm_flow_true <- HistoryMatch(design = scaled_design, Obs = obs_flow, ObsVar = 1/4, TrueOutput = t(output_flow))
+hm_flow_true$NROY
+```
+
+Note: by default, if the observations and true output are at least 50D, the multivariate implausibility is assumed, otherwise the set of 1D implausibilities is calculated. This default behaviour can be overwrriten by setting `Multivariate = TRUE` or `FALSE` as appropriate.
+
+```{r, fig.height=5}
+PlotNROY(hm_flow_true$Design, k = 1:5, Truth = truth)
+```
+
 
