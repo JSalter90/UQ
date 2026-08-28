@@ -1424,7 +1424,7 @@ ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output
   preds <- Predict(emulator, design[data_inds,])
 
   # Draw samples
-  Samples <- BasisEmSamples(preds, DataBasis, ns = 1000)
+  Samples <- BasisEmSamples(DataBasis, predictions = preds, ns = 1000)
   
   # Construct truth
   Truth <- DataBasis$CentredField[,data_inds] + DataBasis$EnsembleMean
@@ -1531,10 +1531,12 @@ ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output
 #' 
 #' Takes mean/variance from set of basis emulators and samples reconstructed fields
 #'
-#' @param BasisPred 
-#' @param DataBasis 
-#' @param ns 
-#' @param AddMean 
+#' @param DataBasis Object containing the basis used in emulation (`$tBasis`), of which the first q columns should relate to the q columns of `predictions$Expectation` and `predictions$Variance`.
+#' @param predictions A list containing components `$Expectation` and `$Variance`, where each provide the emulator expectation/variance for a set of inputs, where the rows contains the expectations/variances for different inputs, and the columns contain the q emulated basis vectors. The output of `Predict` can be provided here.
+#' @param emulator A list of emulators for the leading $q$ coefficients of DataBasis$tBasis. If `predictions` are provided, `emulator` is ignored.
+#' @param design Input data frame, where each row is a point at which to evaluate the emulators. Must contain named columns for all inputs that were used in training the provided emulators. If `predictions` are provided, `design` is ignored.
+#' @param ns Number of samples for each input. Defaults to 100.
+#' @param AddMean
 #' @param ReturnAll 
 #' @param BasisUncertainty 
 #' @param ... 
@@ -1542,12 +1544,30 @@ ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output
 #' @returns description
 #' 
 #' @export
-BasisEmSamples <- function(BasisPred, DataBasis, emulator = NULL, design = NULL, ns = 100, AddMean = TRUE, ReturnAll = TRUE, BasisUncertainty = TRUE, ...){
-  n <- nrow(BasisPred$Expectation)
-  q <- ncol(BasisPred$Expectation)
+BasisEmSamples <- function(DataBasis, predictions = NULL, emulator = NULL, design = NULL, ns = 100, AddMean = TRUE, ReturnAll = TRUE, BasisUncertainty = TRUE, ...){
+  
+  # Check provided with emulator and design if don't already have predictons
+  if (is.null(predictions)){
+    if (is.null(emulator)){
+      stop('Must provide both an emulator and design, or a set of predictions')
+    }
+    
+    if (is.null(design)){
+      stop('Must provide both an emulator and design, or a set of predictions')
+    }
+  }
+  
+  # If don't have predictions, create
+  if (is.null(predictions)){
+    predictions <- Predict(emulator, design)
+  }
+  
+  n <- nrow(predictions$Expectation)
+  q <- ncol(predictions$Expectation)
+  
   if (is.null(n)){ # i.e. a single vector has been provided
     n <- 1
-    q <- length(BasisPred$Expectation) 
+    q <- length(predictions$Expectation) 
   }
   
   ell <- nrow(DataBasis$tBasis)
@@ -1570,13 +1590,13 @@ BasisEmSamples <- function(BasisPred, DataBasis, emulator = NULL, design = NULL,
     
     # Append zero means and these variances to $Expectation, $Variance
     if (n == 1){
-      BasisPred$Expectation <- c(BasisPred$Expectation, rep(0, ncol(Basis)-q))
-      BasisPred$Variance <- c(BasisPred$Variance, EstVar)
+      predictions$Expectation <- c(predictions$Expectation, rep(0, ncol(Basis)-q))
+      predictions$Variance <- c(predictions$Variance, EstVar)
     }
     
     if (n > 1){
-      BasisPred$Expectation <- cbind(BasisPred$Expectation, matrix(0, n, ncol(Basis) - q))
-      BasisPred$Variance <- cbind(BasisPred$Variance, matrix(rep(EstVar, each = n), n, ncol(Basis) - q))
+      predictions$Expectation <- cbind(predictions$Expectation, matrix(0, n, ncol(Basis) - q))
+      predictions$Variance <- cbind(predictions$Variance, matrix(rep(EstVar, each = n), n, ncol(Basis) - q))
     }
     
     q <- ncol(Basis)
@@ -1584,8 +1604,8 @@ BasisEmSamples <- function(BasisPred, DataBasis, emulator = NULL, design = NULL,
   
   if (n == 1){
     samp <- matrix(stats::rnorm(q*ns,
-                                mean = rep(BasisPred$Expectation),
-                                sd = rep(sqrt(BasisPred$Variance))), nrow = ns, byrow = TRUE)
+                                mean = rep(predictions$Expectation),
+                                sd = rep(sqrt(predictions$Variance))), nrow = ns, byrow = TRUE)
     em_samp <- mu + Basis %*% t(samp)
   }
   
@@ -1593,8 +1613,8 @@ BasisEmSamples <- function(BasisPred, DataBasis, emulator = NULL, design = NULL,
     em_samp <- array(0, dim = c(ell, ns, n))
     for (i in 1:n){
       samp <- matrix(stats::rnorm(q*ns,
-                                  mean = rep(BasisPred$Expectation[i,]),
-                                  sd = rep(sqrt(BasisPred$Variance[i,]))), nrow = ns, byrow = TRUE)
+                                  mean = rep(predictions$Expectation[i,]),
+                                  sd = rep(sqrt(predictions$Variance[i,]))), nrow = ns, byrow = TRUE)
       em_samp[,,i] <- mu + Basis %*% t(samp)
     }
   }
@@ -1630,18 +1650,36 @@ BasisEmSamples <- function(BasisPred, DataBasis, emulator = NULL, design = NULL,
 #' 
 #' 
 #' 
-#' @param predictions 
-#' @param ns 
+#' @param predictions A list containing components `$Expectation` and `$Variance`, where each provide the emulator expectation/variance for a set of inputs, where the rows contains the expectations/variances for different inputs, and the columns contain the q emulated basis vectors. The output of `Predict` can be provided here.
+#' @param emulator A list of emulators for the leading $q$ coefficients of DataBasis$tBasis. If `predictions` are provided, `emulator` is ignored.
+#' @param design Input data frame, where each row is a point at which to evaluate the emulators. Must contain named columns for all inputs that were used in training the provided emulators. If `predictions` are provided, `design` is ignored.
+#' @param ns Number of samples for each input. Defaults to 100.
 #' @param ReturnAll 
-#' 
 #' 
 #' @returns description
 #' 
 #' @export 
-IndEmSamples <- function(predictions, emulator = NULL, design = NULL, ns = 100, ReturnAll = TRUE){
+IndEmSamples <- function(predictions = NULL, emulator = NULL, design = NULL, ns = 100, ReturnAll = TRUE){
+  
+  # Check provided with emulator and design if don't already have predictons
+  if (is.null(predictions)){
+    if (is.null(emulator)){
+      stop('Must provide both an emulator and design, or a set of predictions')
+    }
+    
+    if (is.null(design)){
+      stop('Must provide both an emulator and design, or a set of predictions')
+    }
+  }
+  
+  # If don't have predictions, create
+  if (is.null(predictions)){
+    predictions <- Predict(emulator, design)
+  }
   
   n <- nrow(predictions$Expectation)
   ell <- ncol(predictions$Expectation)
+  
   if (is.null(n)){ # i.e. a single vector has been provided
     n <- 1
     ell <- length(predictions$Expectation) 
