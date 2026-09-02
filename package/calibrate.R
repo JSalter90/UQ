@@ -915,6 +915,12 @@ PlotNROY <- function(Design, k = NULL, NROY = NULL, Impl = NULL, Truth = NULL){
 
   size <- ifelse(nrow(Design) < 1000, 2, 0.5)
   
+  # If all points are in NROY, remove FALSE from colour scale
+  cols <- cols_validate[-1]
+  if (sum(Design$NROY) == nrow(Design)){
+    cols <- cols[2]
+  }
+  
   # If only 2 inputs provided, single pairs plot
   if (length(k) == 2){
     Design$input1 <- Design[,k[1]]
@@ -926,7 +932,7 @@ PlotNROY <- function(Design, k = NULL, NROY = NULL, Impl = NULL, Truth = NULL){
       theme_bw()
     
     if (is.null(Impl)){
-      plot <- plot + scale_color_manual(values = cols_validate[-1])
+      plot <- plot + scale_color_manual(values = cols)
     }
     else {
       plot <- plot + viridis::scale_color_viridis()
@@ -942,15 +948,28 @@ PlotNROY <- function(Design, k = NULL, NROY = NULL, Impl = NULL, Truth = NULL){
   
   else {
     if (is.null(Impl)){
-      plot <- GGally::ggpairs(Design, columns = k, aes(col = .data$NROY), 
-                              upper = list(continuous = GGally::wrap("density", alpha = 0.5), combo = "box_no_facet"),
-                              lower = list(continuous = GGally::wrap("points", alpha = 0.3, size = size), combo = GGally::wrap("dot_no_facet", alpha = 0.4)),
-                              diag = list(continuous = GGally::wrap("densityDiag", alpha = 0.3)), 
+      plot <- GGally::ggpairs(Design, columns = k, aes(col = .data$NROY, alpha = .data$NROY, size = .data$NROY), 
+                              upper = list(continuous = GGally::wrap("density", alpha = 0.5, size = 0.5), combo = "box_no_facet"),
+                              lower = list(continuous = GGally::wrap("points"), combo = GGally::wrap("dot_no_facet", alpha = 0.4)),
+                              diag = list(continuous = GGally::wrap("densityDiag", alpha = 0.3, size = 0.5)), 
                               legend = c(1,1)) +
         theme_bw() +
         theme(legend.position = "bottom") + 
-        scale_fill_manual(values = cols_validate[-1]) + 
-        scale_color_manual(values = cols_validate[-1])
+        scale_fill_manual(values = cols) + 
+        scale_color_manual(values = cols)
+      
+      if (mean(Design$NROY) < 0.2){
+        plot <- plot +
+          scale_alpha_manual(values = c(0.05,1)) +
+          scale_size_manual(values = c(size, 2*size))
+      }
+      
+      else {
+        plot <- plot +
+          scale_alpha_manual(values = c(0.3,0.3)) +
+          scale_size_manual(values = c(size, size))
+      }
+
     }
 
     else {
@@ -962,7 +981,7 @@ PlotNROY <- function(Design, k = NULL, NROY = NULL, Impl = NULL, Truth = NULL){
         theme_bw() +
         theme(legend.position = "bottom") + 
         labs(col = 'Implausibility') +
-        scale_fill_manual(values = cols_validate[-1], guide = 'none') + 
+        scale_fill_manual(values = cols_validate, guide = 'none') + 
         viridis::scale_color_viridis()
     }
 
