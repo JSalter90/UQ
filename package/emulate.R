@@ -1038,7 +1038,7 @@ Validate <- function(emulator, valData, interval = 0.95, by_index = FALSE, by_in
   
   else {
     plot <- parallel::mclapply(1:n_em, 
-                               function(k) ValidateSingle(emulator[[k]], valData, interval = interval, by_index = by_index, by_input = by_input, Obs = Obs),
+                               function(k) ValidateSingle(emulator[[k]], valData, interval = interval, by_index = by_index, by_input = by_input, Obs = Obs[k]),
                                 mc.cores = n_cores)
   }
   
