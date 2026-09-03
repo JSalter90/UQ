@@ -1032,6 +1032,12 @@ Validate <- function(emulator, valData, interval = 0.95, by_index = FALSE, by_in
     n_em <- length(emulator)
   }
   
+  if (!(is.null(Obs))){
+    if (!(length(Obs) == n_em)){
+      stop('Number of observations must be the same as number of emulators.')
+    }
+  }
+  
   if (n_em == 1){
     plot <- ValidateSingle(emulator, valData, interval = interval, by_index = by_index, by_input = by_input, Obs = Obs)
   }
@@ -1333,7 +1339,7 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, by_in
       geom_point(col = cols[1]) +
       geom_point(aes(x = .data$ind, y = .data$truth, col = .data$In95)) +
       scale_colour_manual(values = c(cols[2:3])) +
-      labs(y = 'Prediction', x = 'Input', title = paste0('Outside ', 100*diff(interval), '% = ', perc_outside, '%')) +
+      labs(y = 'Prediction', x = 'Index', title = paste0('Outside ', 100*diff(interval), '% = ', perc_outside, '%')) +
       theme_bw() +
       theme(legend.position = 'none')
     
@@ -1692,7 +1698,7 @@ IndEmSamples <- function(predictions = NULL, emulator = NULL, design = NULL, ns 
   if (n == 1){
     em_samp <- matrix(stats::rnorm(ell*ns,
                                    mean = rep(predictions$Expectation, each = ns),
-                                   sd = rep(sqrt(predictions$Variance)), each = ns), nrow = ell, byrow = TRUE)
+                                   sd = rep(sqrt(predictions$Variance), each = ns)), nrow = ell, byrow = TRUE)
   }
   
   else if (n > 1){
