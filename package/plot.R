@@ -533,7 +533,13 @@ PlotSamples <- function(DataBasis, emulator = NULL, design = NULL, samples = NUL
   
   # If samples not provided, create
   if (is.null(samples)){
-    samples <- BasisEmSamples(DataBasis, emulator = emulator, design = design, AddMean = AddMean, ...)
+    if (length(emulator) == nrow(DataBasis$tBasis)){
+      samples <- IndEmSamples(emulator = emulator, design = design, ...)
+    }
+    
+    else {
+      samples <- BasisEmSamples(DataBasis, emulator = emulator, design = design, AddMean = AddMean, ...)
+    }
   }
   
   ell <- nrow(DataBasis$tBasis) # dimension of field
@@ -856,7 +862,7 @@ PlotPair <- function(coeffs, x = 'C1', y = 'C2', col = NULL, obs = NULL){
   }
   
   if (!(is.null(obs))){
-    plot <- plot + geom_point(data = plot_data_obs, col = cols_good, size = 4, shape = 17)
+    plot <- plot + geom_point(data = plot_data_obs, col = 'red', size = 4, shape = 17)
   }
   
   return(plot)
