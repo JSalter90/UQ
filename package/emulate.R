@@ -1011,13 +1011,14 @@ PredictDGP <- function(emulator, design){
 #' @param interval Prediction interval to plot as error bars. Defaults to 0.95, can be in (0,1).
 #' @param by_index Whether the x axis should be the true simulator output (`FALSE`, the default) or the training point index.
 #' @param by_input Whether to additionally produce plots with each input in turn on the x axis. Defaults to `FALSE`.
-#' @param Obs If provided, adds horizontal and/or vertical dashed lines to show the location of the observation(s) relative to the emulator predictions. Defaults to `NULL`.
+#' @param Obs Observation vector. If provided, adds horizontal and/or vertical lines to show the location of the observation(s) relative to the emulator predictions. Defaults to `NULL`.
+#' @param ObsVar Observation variance vector. If provided, adds horizontal and/or vertical dashed lines representing 100*interval % uncertainty around the observation(s), assuming Normality. Defaults to `NULL`.
 #'
 #' @returns
 #' @export
 #'
 #' @examples
-Validate <- function(emulator, valData, interval = 0.95, by_index = FALSE, by_input = FALSE, Obs = NULL){
+Validate <- function(emulator, valData, interval = 0.95, by_index = FALSE, by_input = FALSE, Obs = NULL, ObsVar = NULL){
   
   if (interval <= 0 | interval >= 1){
     stop('interval must be between 0 and 1')
@@ -1038,13 +1039,23 @@ Validate <- function(emulator, valData, interval = 0.95, by_index = FALSE, by_in
     }
   }
   
+  if (is.null(Obs) & !(is.null(ObsVar))){
+    stop('If provide ObsVar, also need to provide Obs.')
+  }
+  
+  if (!(is.null(ObsVar))){
+    if (!(length(ObsVar) == n_em)){
+      stop('Number of observation variances must be the same as number of emulators.')
+    }
+  }
+  
   if (n_em == 1){
-    plot <- ValidateSingle(emulator, valData, interval = interval, by_index = by_index, by_input = by_input, Obs = Obs)
+    plot <- ValidateSingle(emulator, valData, interval = interval, by_index = by_index, by_input = by_input, Obs = Obs, ObsVar = ObsVar)
   }
   
   else {
     plot <- parallel::mclapply(1:n_em, 
-                               function(k) ValidateSingle(emulator[[k]], valData, interval = interval, by_index = by_index, by_input = by_input, Obs = Obs[k]),
+                               function(k) ValidateSingle(emulator[[k]], valData, interval = interval, by_index = by_index, by_input = by_input, Obs = Obs[k], ObsVar = ObsVar[k]),
                                 mc.cores = n_cores)
   }
   
@@ -1070,12 +1081,13 @@ Validate <- function(emulator, valData, interval = 0.95, by_index = FALSE, by_in
 #' @param interval Prediction interval to plot as error bars. Defaults to 0.95, can be in (0,1).
 #' @param by_index Whether the x axis should be the true simulator output (`FALSE`, the default) or the training point index.
 #' @param by_input Whether to additionally produce plots with each input in turn on the x axis. Defaults to `FALSE`.
-#' @param Obs If provided, adds horizontal and/or vertical dashed lines to show the location of the observation(s) relative to the emulator predictions. Defaults to `NULL`.
+#' @param Obs Observation vector. If provided, adds horizontal and/or vertical lines to show the location of the observation(s) relative to the emulator predictions. Defaults to `NULL`.
+#' @param ObsVar Observation variance vector. If provided, adds horizontal and/or vertical dashed lines representing 100*interval % uncertainty around the observation(s), assuming Normality. Defaults to `NULL`.
 #'
 #' @returns Plot(s).
 #' 
 #' @export
-ValidateSingle <- function(emulator, valData, interval = 0.95, by_index = FALSE, by_input = FALSE, Obs = NULL){
+ValidateSingle <- function(emulator, valData, interval = 0.95, by_index = FALSE, by_input = FALSE, Obs = NULL, ObsVar = NULL){
   
   if (interval <= 0 | interval >= 1){
     stop('interval must be between 0 and 1')
@@ -1142,7 +1154,13 @@ ValidateSingle <- function(emulator, valData, interval = 0.95, by_index = FALSE,
       theme(legend.position = 'none')
     
     if (!(is.null(Obs))){
-      plot1 <- plot1 + geom_hline(aes(yintercept = as.numeric(Obs)), linetype = 'dashed')
+      plot1 <- plot1 + geom_hline(aes(yintercept = as.numeric(Obs)), alpha = 0.5)
+    }
+    
+    if (!(is.null(ObsVar))){
+      plot1 <- plot1 + 
+        geom_hline(aes(yintercept = as.numeric(Obs) + stats::qnorm(interval[1])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5) +
+        geom_hline(aes(yintercept = as.numeric(Obs) + stats::qnorm(interval[2])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5)
     }
   }
   
@@ -1158,8 +1176,16 @@ ValidateSingle <- function(emulator, valData, interval = 0.95, by_index = FALSE,
     
     if (!(is.null(Obs))){
       plot1 <- plot1 + 
-        geom_hline(aes(yintercept = as.numeric(Obs)), linetype = 'dashed') + 
-        geom_vline(aes(xintercept = as.numeric(Obs)), linetype = 'dashed')
+        geom_hline(aes(yintercept = as.numeric(Obs)), alpha = 0.5) + 
+        geom_vline(aes(xintercept = as.numeric(Obs)), alpha = 0.5)
+    }
+    
+    if (!(is.null(ObsVar))){
+      plot1 <- plot1 + 
+        geom_hline(aes(yintercept = as.numeric(Obs) + stats::qnorm(interval[1])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5) +
+        geom_hline(aes(yintercept = as.numeric(Obs) + stats::qnorm(interval[2])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5) +
+        geom_vline(aes(xintercept = as.numeric(Obs) + stats::qnorm(interval[1])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5) +
+        geom_vline(aes(xintercept = as.numeric(Obs) + stats::qnorm(interval[2])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5)
     }
   }
 
@@ -1178,7 +1204,13 @@ ValidateSingle <- function(emulator, valData, interval = 0.95, by_index = FALSE,
       theme(legend.position = 'none')
     
     if (!(is.null(Obs))){
-      plot2 <- plot2 + geom_hline(aes(yintercept = as.numeric(Obs)), linetype = 'dashed')
+      plot2 <- plot2 + geom_hline(aes(yintercept = as.numeric(Obs)), alpha = 0.5)
+    }
+    
+    if (!(is.null(ObsVar))){
+      plot2 <- plot2 + 
+        geom_hline(aes(yintercept = as.numeric(Obs) + stats::qnorm(interval[1])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5) +
+        geom_hline(aes(yintercept = as.numeric(Obs) + stats::qnorm(interval[2])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5)
     }
   }
   
@@ -1206,13 +1238,14 @@ ValidateSingle <- function(emulator, valData, interval = 0.95, by_index = FALSE,
 #' @param interval Prediction interval to plot as error bars. Defaults to 0.95, can be in (0,1).
 #' @param by_index Whether the x axis should be the true simulator output (`FALSE`, the default) or the training point index.
 #' @param by_input Whether to additionally produce plots with each input in turn on the x axis. Defaults to `FALSE`.
-#' @param Obs If provided, adds horizontal and/or vertical dashed lines to show the location of the observation(s) relative to the emulator predictions. Defaults to `NULL`.
+#' @param Obs Observation vector. If provided, adds horizontal and/or vertical lines to show the location of the observation(s) relative to the emulator predictions. Defaults to `NULL`.
+#' @param ObsVar Observation variance vector. If provided, adds horizontal and/or vertical dashed lines representing 100*interval % uncertainty around the observation(s), assuming Normality. Defaults to `NULL`.
 #'
 #' @returns Leave-one-out plots for each emulator.
 #' @export
 #'
 #' @examples
-LeaveOneOut <- function(emulator, interval = 0.95, by_index = FALSE, by_input = FALSE, Obs = NULL){
+LeaveOneOut <- function(emulator, interval = 0.95, by_index = FALSE, by_input = FALSE, Obs = NULL, ObsVar = NULL){
   
   # Find number of emulators
   if (!(is.null(emulator$method))){
@@ -1223,13 +1256,29 @@ LeaveOneOut <- function(emulator, interval = 0.95, by_index = FALSE, by_input = 
     n_em <- length(emulator)
   }
   
+  if (!(is.null(Obs))){
+    if (!(length(Obs) == n_em)){
+      stop('Number of observations must be the same as number of emulators.')
+    }
+  }
+  
+  if (is.null(Obs) & !(is.null(ObsVar))){
+    stop('If provide ObsVar, also need to provide Obs.')
+  }
+  
+  if (!(is.null(ObsVar))){
+    if (!(length(ObsVar) == n_em)){
+      stop('Number of observation variances must be the same as number of emulators.')
+    }
+  }
+  
   if (n_em == 1){
-    plot <- LeaveOneOutSingle(emulator, interval = interval, by_index = by_index, by_input = by_input, Obs = Obs)
+    plot <- LeaveOneOutSingle(emulator, interval = interval, by_index = by_index, by_input = by_input, Obs = Obs, ObsVar = ObsVar)
   }
   
   else {
     plot <- parallel::mclapply(1:n_em, 
-                               function(k) LeaveOneOutSingle(emulator[[k]], interval = interval, by_index = by_index, by_input = by_input, Obs = Obs[k]),
+                               function(k) LeaveOneOutSingle(emulator[[k]], interval = interval, by_index = by_index, by_input = by_input, Obs = Obs[k], ObsVar = ObsVar[k]),
                                mc.cores = n_cores)
   }
   
@@ -1257,12 +1306,13 @@ LeaveOneOut <- function(emulator, interval = 0.95, by_index = FALSE, by_input = 
 #' @param interval Prediction interval to plot as error bars. Defaults to 0.95, can be in (0,1).
 #' @param by_index Whether the x axis should be the true simulator output (`FALSE`, the default) or the training point index.
 #' @param by_input Whether to additionally produce plots with each input in turn on the x axis. Defaults to `FALSE`.
-#' @param Obs If provided, adds horizontal and/or vertical dashed lines to show the location of the observation(s) relative to the emulator predictions. Defaults to `NULL`.
+#' @param Obs Observation vector. If provided, adds horizontal and/or vertical lines to show the location of the observation(s) relative to the emulator predictions. Defaults to `NULL`.
+#' @param ObsVar Observation variance vector. If provided, adds horizontal and/or vertical dashed lines representing 100*interval % uncertainty around the observation(s), assuming Normality. Defaults to `NULL`.
 #' 
 #' @returns Leave-one-out plot(s).
 #' 
 #' @export
-LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, by_input = FALSE, Obs = NULL){
+LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, by_input = FALSE, Obs = NULL, ObsVar = NULL){
 
   if (interval <= 0 | interval >= 1){
     stop('interval must be between 0 and 1')
@@ -1344,7 +1394,13 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, by_in
       theme(legend.position = 'none')
     
     if (!(is.null(Obs))){
-      plot1 <- plot1 + geom_hline(aes(yintercept = as.numeric(Obs)), linetype = 'dashed')
+      plot1 <- plot1 + geom_hline(aes(yintercept = as.numeric(Obs)), alpha = 0.5)
+    }
+    
+    if (!(is.null(ObsVar))){
+      plot1 <- plot1 + 
+        geom_hline(aes(yintercept = as.numeric(Obs) + stats::qnorm(interval[1])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5) +
+        geom_hline(aes(yintercept = as.numeric(Obs) + stats::qnorm(interval[2])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5)
     }
   }
   
@@ -1360,8 +1416,16 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, by_in
     
     if (!(is.null(Obs))){
       plot1 <- plot1 + 
-        geom_hline(aes(yintercept = as.numeric(Obs)), linetype = 'dashed') + 
-        geom_vline(aes(xintercept = as.numeric(Obs)), linetype = 'dashed')
+        geom_hline(aes(yintercept = as.numeric(Obs)), alpha = 0.5) + 
+        geom_vline(aes(xintercept = as.numeric(Obs)), alpha = 0.5)
+    }
+    
+    if (!(is.null(ObsVar))){
+      plot1 <- plot1 + 
+        geom_hline(aes(yintercept = as.numeric(Obs) + stats::qnorm(interval[1])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5) +
+        geom_hline(aes(yintercept = as.numeric(Obs) + stats::qnorm(interval[2])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5) +
+        geom_vline(aes(xintercept = as.numeric(Obs) + stats::qnorm(interval[1])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5) +
+        geom_vline(aes(xintercept = as.numeric(Obs) + stats::qnorm(interval[2])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5)
     }
   }
   
@@ -1380,7 +1444,13 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, by_in
       theme(legend.position = 'none')
     
     if (!(is.null(Obs))){
-      plot2 <- plot2 + geom_hline(aes(yintercept = as.numeric(Obs)), linetype = 'dashed')
+      plot2 <- plot2 + geom_hline(aes(yintercept = as.numeric(Obs)), alpha = 0.5)
+    }
+    
+    if (!(is.null(ObsVar))){
+      plot2 <- plot2 + 
+        geom_hline(aes(yintercept = as.numeric(Obs) + stats::qnorm(interval[1])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5) +
+        geom_hline(aes(yintercept = as.numeric(Obs) + stats::qnorm(interval[2])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5)
     }
   }
   
@@ -1409,12 +1479,13 @@ LeaveOneOutSingle <- function(emulator, interval = 0.95, by_index = FALSE, by_in
 #' @param data_inds 
 #' @param plot_sum 
 #' @param by_index Whether the x axis should be the true simulator output (`FALSE`, the default) or the training point index.
-#' @param Obs If provided, adds horizontal and/or vertical dashed lines to show the location of the observation(s) relative to the emulator predictions. Defaults to `NULL`.
+#' @param Obs Observation vector. If provided, adds horizontal and/or vertical lines to show the location of the observation(s) relative to the emulator predictions. Defaults to `NULL`.
+#' @param ObsVar Observation variance vector. If provided, adds horizontal and/or vertical dashed lines representing 100*interval % uncertainty around the observation(s), assuming Normality. Defaults to `NULL`.
 #'
 #' @returns Validation plot comparing truth and emulator samples
 #'
 #' @export
-ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output_inds = NULL, data_inds = NULL, plot_sum = FALSE, by_index = FALSE, Obs = NULL, ns = 1000){
+ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output_inds = NULL, data_inds = NULL, plot_sum = FALSE, by_index = FALSE, Obs = NULL, ObsVar = NULL, ns = 1000){
   
   if (interval <= 0 | interval >= 1){
     stop('interval must be between 0 and 1')
@@ -1512,7 +1583,13 @@ ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output
       theme(legend.position = 'none')
     
     if (!(is.null(Obs))){
-      plot <- plot + geom_hline(aes(yintercept = as.numeric(Obs)), linetype = 'dashed')
+      plot <- plot + geom_hline(aes(yintercept = as.numeric(Obs)), alpha = 0.5)
+    }
+    
+    if (!(is.null(ObsVar))){
+      plot1 <- plot1 + 
+        geom_hline(aes(yintercept = as.numeric(Obs) + stats::qnorm(interval[1])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5) +
+        geom_hline(aes(yintercept = as.numeric(Obs) + stats::qnorm(interval[2])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5)
     }
   }
   
@@ -1528,8 +1605,16 @@ ValidateSummary <- function(emulator, design, DataBasis, interval = 0.95, output
     
     if (!(is.null(Obs))){
       plot <- plot + 
-        geom_hline(aes(yintercept = as.numeric(Obs)), linetype = 'dashed') + 
-        geom_vline(aes(xintercept = as.numeric(Obs)), linetype = 'dashed')
+        geom_hline(aes(yintercept = as.numeric(Obs)), alpha = 0.5) + 
+        geom_vline(aes(xintercept = as.numeric(Obs)), alpha = 0.5)
+    }
+    
+    if (!(is.null(ObsVar))){
+      plot1 <- plot1 + 
+        geom_hline(aes(yintercept = as.numeric(Obs) + stats::qnorm(interval[1])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5) +
+        geom_hline(aes(yintercept = as.numeric(Obs) + stats::qnorm(interval[2])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5) +
+        geom_vline(aes(xintercept = as.numeric(Obs) + stats::qnorm(interval[1])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5) +
+        geom_vline(aes(xintercept = as.numeric(Obs) + stats::qnorm(interval[2])*as.numeric(sqrt(ObsVar))), linetype = 'dashed', alpha = 0.5)
     }
   }
 
