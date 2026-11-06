@@ -45,7 +45,7 @@ PlotBasis <- function(DataBasis, q = 9, output_inds = NULL){
 
   # Flag for whether the 2nd dimension relates to grid values or multiple variables
   if (length(input_names) > 1){
-    multi_var <- ifelse(length(unique(DataBasis$grid[,2])) < 10, TRUE, FALSE)
+    multi_var <- ifelse(length(unique(input_values[,2])) < 10, TRUE, FALSE)
   }
 
   if (length(input_names) == 1){
@@ -176,7 +176,7 @@ PlotData <- function(DataBasis, AddMean = TRUE, data_inds = NULL, output_inds = 
 
   # Flag for whether the 2nd dimension relates to grid values or multiple variables
   if (length(input_names) > 1){
-    multi_var <- ifelse(length(unique(DataBasis$grid[,2])) < 10, TRUE, FALSE)
+    multi_var <- ifelse(length(unique(input_values[,2])) < 10, TRUE, FALSE)
   }
 
   if (length(input_names) == 1){
@@ -384,7 +384,7 @@ PlotRecon <- function(DataBasis, q = 1, data_inds = 1:16, AddMean = TRUE, residu
   
   # Flag for whether the 2nd dimension relates to grid values or multiple variables
   if (length(input_names) > 1){
-    multi_var <- ifelse(length(unique(DataBasis$grid[,2])) < 10, TRUE, FALSE)
+    multi_var <- ifelse(length(unique(input_values[,2])) < 10, TRUE, FALSE)
   }
   
   if (length(input_names) == 1){
@@ -620,7 +620,7 @@ PlotSamples <- function(DataBasis, emulator = NULL, design = NULL, samples = NUL
   
   # Flag for whether the 2nd dimension relates to grid values or multiple variables
   if (length(input_names) > 1){
-    multi_var <- ifelse(length(unique(DataBasis$grid[,2])) < 10, TRUE, FALSE)
+    multi_var <- ifelse(length(unique(input_values[,2])) < 10, TRUE, FALSE)
   }
   
   if (length(input_names) == 1){
@@ -815,27 +815,36 @@ ProcessSamples <- function(samples, input_values, input_names, multi_var, output
 
 
 
-#' Plot pairs of coefficients and/or inputs, potentially coloured by a 3rd variable
+#' Pairs plot
 #' 
-#' Takes either output of `Project`, or something like tData (containing inputs and coefficients)
+#' Plot pairs of coefficients and/or inputs, potentially coloured by a 3rd variable.
 #'
-#' @param coeffs 
-#' @param x 
-#' @param y 
-#' @param col 
+#' @param data
+#' @param x Name of variable to plot on the x axis. Defaults to `NULL`, which selects the 1st column of `data`.
+#' @param y Name of variable to plot on the y axis. Defaults to `NULL`, which selects the 2nd column of `data`.
+#' @param col Name of variable to colour points by. Defaults to `NULL`, i.e. colours all points the same.
 #' @param obs 
 #' 
 #' @returns description
 #' 
 #' @export
-PlotPair <- function(coeffs, x = 'C1', y = 'C2', col = NULL, obs = NULL){
+PlotPair <- function(data, x = NULL, y = NULL, col = NULL, obs = NULL){
   
-  coeffs <- as.data.frame(coeffs)
-  plot_data <- data.frame(x = coeffs[,x],
-                          y = coeffs[,y])
+  data <- as.data.frame(data)
+
+  if (is.null(x)){
+    x <- colnames(data)[1]
+  }
+  
+  if (is.null(y)){
+    y <- colnames(data)[2]
+  }
+
+  plot_data <- data.frame(x = data[,x],
+                          y = data[,y])
   
   if (!(is.null(col))){
-    plot_data$col <- coeffs[,col]
+    plot_data$col <- data[,col]
   }
   
   else {
