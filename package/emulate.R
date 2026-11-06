@@ -1049,8 +1049,16 @@ Validate <- function(emulator, valData, interval = 0.95, by_index = FALSE, by_in
     }
   }
   
+  # List emulator types (if any are dgp, don't use mclapply later)
+  em_types <- unlist(lapply(1:n_em, function(k) emulator[[k]]$method))
+  
   if (n_em == 1){
     plot <- ValidateSingle(emulator, valData, interval = interval, by_index = by_index, by_input = by_input, Obs = Obs, ObsVar = ObsVar)
+  }
+  
+  else if (any(em_types %in% c('gp', 'dgp'))){
+    plot <- lapply(1:n_em, 
+                   function(k) ValidateSingle(emulator[[k]], valData, interval = interval, by_index = by_index, by_input = by_input, Obs = Obs[k], ObsVar = ObsVar[k]))
   }
   
   else {
@@ -1272,8 +1280,16 @@ LeaveOneOut <- function(emulator, interval = 0.95, by_index = FALSE, by_input = 
     }
   }
   
+  # List emulator types (if any are dgp, don't use mclapply later)
+  em_types <- unlist(lapply(1:n_em, function(k) emulator[[k]]$method))
+  
   if (n_em == 1){
     plot <- LeaveOneOutSingle(emulator, interval = interval, by_index = by_index, by_input = by_input, Obs = Obs, ObsVar = ObsVar)
+  }
+  
+  else if (any(em_types %in% c('gp', 'dgp'))){
+    plot <- lapply(1:n_em, 
+                   function(k) LeaveOneOutSingle(emulator[[k]], interval = interval, by_index = by_index, by_input = by_input, Obs = Obs[k], ObsVar = ObsVar[k]))
   }
   
   else {
